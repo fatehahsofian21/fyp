@@ -153,7 +153,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           color: Colors.white),
                       onPressed: () {},
                     ),
-                    const SizedBox(width: 5),
+                    const SizedBox(width: 3), // Tighter spacing
                     IconButton(
                       icon: const Icon(Icons.notifications_outlined,
                           color: Colors.white),
@@ -167,16 +167,18 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       body: Center(
-        // Centering all content vertically and horizontally
+        // **Everything Centered**
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center, // Perfectly centered
-          crossAxisAlignment: CrossAxisAlignment.center, // Center horizontally
+          mainAxisAlignment:
+              MainAxisAlignment.center, // **Centered between top & bottom**
+          crossAxisAlignment:
+              CrossAxisAlignment.center, // **Centered left & right**
           children: [
             GestureDetector(
               onTap: _showImageSourceDialog,
               child: Container(
-                width: 220,
-                height: 220,
+                width: 250, // **Slightly smaller**
+                height: 250, // **Slightly smaller**
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(20),
@@ -202,7 +204,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     : null,
               ),
             ),
-            const SizedBox(height: 20), // Space between image and button
+            const SizedBox(height: 25), // **Balanced Spacing**
             SizedBox(
               width: 160,
               height: 40,
