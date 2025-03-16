@@ -3,6 +3,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'dart:convert';
+
+import 'result.dart'; // Import the result page
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -12,9 +15,10 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  String _userName = "User"; // Default value
-  bool _isLoading = true; // Show loading indicator
-  File? _selectedImage; // Store the selected image
+  String _userName = "User";
+  bool _isLoading = true;
+  File? _selectedImage;
+  String? _base64Image;
 
   @override
   void initState() {
@@ -32,7 +36,7 @@ class _HomeScreenState extends State<HomeScreen> {
             .get();
 
         String fullName = userDoc["name"] ?? "User";
-        String firstName = fullName.split(" ")[0]; // Extract only the first name
+        String firstName = fullName.split(" ")[0];
 
         setState(() {
           _userName = firstName;
@@ -47,19 +51,22 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // Function to pick an image from the gallery or camera
   Future<void> _pickImage(ImageSource source) async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: source);
 
     if (pickedFile != null) {
+      File imageFile = File(pickedFile.path);
+      List<int> imageBytes = await imageFile.readAsBytes();
+      String base64Image = base64Encode(imageBytes);
+
       setState(() {
-        _selectedImage = File(pickedFile.path);
+        _selectedImage = imageFile;
+        _base64Image = base64Image;
       });
     }
   }
 
-  // Show options for selecting image source
   void _showImageSourceDialog() {
     showModalBottomSheet(
       context: context,
@@ -88,45 +95,69 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _startScan() {
+    if (_selectedImage != null && _base64Image != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ResultScreen(
+            base64Image: _base64Image!,
+            detectionResults: {
+              "Basal Cell Carcinoma": 0.95,
+              "Squamous Cell Carcinoma": 0.05,
+            },
+          ),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Please select an image first!"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF2F4858),
       appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(120), // Increased header height
+        preferredSize: const Size.fromHeight(90),
         child: AppBar(
           backgroundColor: const Color(0xFF2F4858),
           elevation: 0,
           flexibleSpace: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20),
+            padding: const EdgeInsets.only(left: 10.0, right: 5.0, top: 45),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Row(
                   children: [
-                    Image.asset('assets/a.png', width: 60), // Larger logo size
-                    const SizedBox(width: 10),
+                    Image.asset('assets/a.png', width: 70),
+                    const SizedBox(width: 5),
                     _isLoading
                         ? const CircularProgressIndicator(color: Colors.white)
                         : Text(
                             "Welcome back, $_userName!",
-                            style: const TextStyle(color: Colors.white, fontSize: 18),
+                            style: const TextStyle(
+                                color: Colors.white, fontSize: 18),
                           ),
                   ],
                 ),
                 Row(
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.diamond_outlined, color: Colors.white),
-                      onPressed: () {
-                        // TODO: Handle premium feature
-                      },
+                      icon: const Icon(Icons.diamond_outlined,
+                          color: Colors.white),
+                      onPressed: () {},
                     ),
+                    const SizedBox(width: 5),
                     IconButton(
-                      icon: const Icon(Icons.notifications_outlined, color: Colors.white),
-                      onPressed: () {
-                        // TODO: Handle notifications
-                      },
+                      icon: const Icon(Icons.notifications_outlined,
+                          color: Colors.white),
+                      onPressed: () {},
                     ),
                   ],
                 ),
@@ -136,55 +167,64 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       body: Center(
-        child: GestureDetector(
-          onTap: _showImageSourceDialog, // Opens selection dialog
-          child: Container(
-            width: 250,
-            height: 250,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(20),
-              image: _selectedImage != null
-                  ? DecorationImage(
-                      image: FileImage(_selectedImage!),
-                      fit: BoxFit.cover,
-                    )
-                  : null, // Show selected image if available
+        // Centering all content vertically and horizontally
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center, // Perfectly centered
+          crossAxisAlignment: CrossAxisAlignment.center, // Center horizontally
+          children: [
+            GestureDetector(
+              onTap: _showImageSourceDialog,
+              child: Container(
+                width: 220,
+                height: 220,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(20),
+                  image: _selectedImage != null
+                      ? DecorationImage(
+                          image: FileImage(_selectedImage!),
+                          fit: BoxFit.cover,
+                        )
+                      : null,
+                ),
+                child: _selectedImage == null
+                    ? const Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.camera_alt, size: 40, color: Colors.white),
+                          SizedBox(height: 10),
+                          Text(
+                            "Click to start scan",
+                            style: TextStyle(color: Colors.white, fontSize: 14),
+                          ),
+                        ],
+                      )
+                    : null,
+              ),
             ),
-            child: _selectedImage == null
-                ? const Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.camera_alt, size: 50, color: Colors.white),
-                      SizedBox(height: 10),
-                      Text(
-                        "Click to start scan",
-                        style: TextStyle(color: Colors.white, fontSize: 16),
-                      ),
-                    ],
-                  )
-                : null,
-          ),
+            const SizedBox(height: 20), // Space between image and button
+            SizedBox(
+              width: 160,
+              height: 40,
+              child: ElevatedButton(
+                onPressed: _startScan,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFD6C3B8),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: const Text(
+                  "START SCAN",
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black),
+                ),
+              ),
+            ),
+          ],
         ),
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: Colors.white.withOpacity(0.2),
-        selectedItemColor: Colors.white,
-        unselectedItemColor: Colors.white70,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: "Home",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.history),
-            label: "History",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: "Profile",
-          ),
-        ],
       ),
     );
   }

@@ -27,6 +27,7 @@ dependencies:
 
   # Path provider for temporary storage location
   path_provider: ^2.1.3
+  firebase_storage: ^12.4.4
 
 dev_dependencies:
   flutter_test:
