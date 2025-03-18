@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
+import 'hospitals.dart'; // Import HospitalsScreen
 
 class ResultScreen extends StatelessWidget {
   final String base64Image;
@@ -20,30 +21,29 @@ class ResultScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text(
           "Scan Result",
-          style: TextStyle(color: Colors.white), // **Title in White**
-          textAlign: TextAlign.center, // **Centered Text**
+          style: TextStyle(color: Colors.white),
         ),
         backgroundColor: const Color(0xFF2F4858),
-        centerTitle: true, // **Centers Title in AppBar**
-        iconTheme: const IconThemeData(color: Colors.white), // **Back Arrow in White**
+        centerTitle: true,
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
-      body: Center( // **Everything is Centered**
+      body: Center(
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center, // **Centered Between Top & Bottom**
-          crossAxisAlignment: CrossAxisAlignment.center, // **Centered Left & Right**
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             const Text(
               "Skin Cancer Detected!",
               style: TextStyle(
                 color: Colors.green,
-                fontSize: 22, // **Slightly Bigger Font**
+                fontSize: 22,
                 fontWeight: FontWeight.bold,
               ),
-              textAlign: TextAlign.center, // **Centered Text**
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 20),
 
-            // **Bigger Image, Fully Centered**
+            // **Display Image**
             Container(
               width: 220,
               height: 220,
@@ -58,7 +58,7 @@ class ResultScreen extends StatelessWidget {
 
             const SizedBox(height: 20),
 
-            // **Detection Results Fully Centered**
+            // **Detection Results**
             Column(
               children: detectionResults.entries.map((entry) {
                 return Padding(
@@ -66,7 +66,7 @@ class ResultScreen extends StatelessWidget {
                   child: Text(
                     "${entry.key}: ${(entry.value * 100).toStringAsFixed(2)}%",
                     style: const TextStyle(color: Colors.white, fontSize: 16),
-                    textAlign: TextAlign.center, // **Centered Text**
+                    textAlign: TextAlign.center,
                   ),
                 );
               }).toList(),
@@ -74,9 +74,10 @@ class ResultScreen extends StatelessWidget {
 
             const SizedBox(height: 30),
 
-            // **Buttons, Centered & Same Size as HomeScreen**
+            // **Buttons**
             Column(
               children: [
+                // **Retry Button**
                 SizedBox(
                   width: 160,
                   height: 40,
@@ -86,7 +87,7 @@ class ResultScreen extends StatelessWidget {
                       Navigator.pop(context);
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey[600], // Retry Button Color
+                      backgroundColor: Colors.grey[600],
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
@@ -95,17 +96,23 @@ class ResultScreen extends StatelessWidget {
                         style: TextStyle(fontSize: 14, color: Colors.white)),
                   ),
                 ),
-                const SizedBox(height: 12), // **Reduced Spacing**
+                const SizedBox(height: 12),
 
+                // **Nearest Hospitals Button**
                 SizedBox(
                   width: 160,
                   height: 40,
                   child: ElevatedButton(
                     onPressed: () {
-                      // TODO: Implement Nearest Hospitals Feature
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const HospitalsScreen(),
+                        ),
+                      );
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blueAccent, // Hospital Button Color
+                      backgroundColor: Colors.blueAccent,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
@@ -114,15 +121,16 @@ class ResultScreen extends StatelessWidget {
                         style: TextStyle(fontSize: 13, color: Colors.white)),
                   ),
                 ),
-                const SizedBox(height: 12), // **Reduced Spacing**
+                const SizedBox(height: 12),
 
+                // **Done Button**
                 SizedBox(
                   width: 160,
                   height: 40,
                   child: ElevatedButton(
                     onPressed: () => Navigator.pop(context),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green, // Done Button Color
+                      backgroundColor: Colors.green,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
