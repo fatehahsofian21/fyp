@@ -19,6 +19,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = true;
   File? _selectedImage;
   String? _base64Image;
+  bool _hasScannedBefore = false; // Track if user has scanned before
 
   @override
   void initState() {
@@ -106,9 +107,14 @@ class _HomeScreenState extends State<HomeScreen> {
               "Basal Cell Carcinoma": 0.95,
               "Squamous Cell Carcinoma": 0.05,
             },
+            onRetry: _resetImage, // Clear image when retrying
           ),
         ),
-      );
+      ).then((_) {
+        setState(() {
+          _hasScannedBefore = true; // Set flag to show "RESCAN" button after returning
+        });
+      });
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -117,6 +123,13 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
     }
+  }
+
+  void _resetImage() {
+    setState(() {
+      _selectedImage = null;
+      _base64Image = null;
+    });
   }
 
   @override
@@ -141,22 +154,19 @@ class _HomeScreenState extends State<HomeScreen> {
                         ? const CircularProgressIndicator(color: Colors.white)
                         : Text(
                             "Welcome back, $_userName!",
-                            style: const TextStyle(
-                                color: Colors.white, fontSize: 18),
+                            style: const TextStyle(color: Colors.white, fontSize: 18),
                           ),
                   ],
                 ),
                 Row(
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.diamond_outlined,
-                          color: Colors.white),
+                      icon: const Icon(Icons.diamond_outlined, color: Colors.white),
                       onPressed: () {},
                     ),
-                    const SizedBox(width: 3), // Tighter spacing
+                    const SizedBox(width: 3),
                     IconButton(
-                      icon: const Icon(Icons.notifications_outlined,
-                          color: Colors.white),
+                      icon: const Icon(Icons.notifications_outlined, color: Colors.white),
                       onPressed: () {},
                     ),
                   ],
@@ -167,18 +177,15 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       body: Center(
-        // **Everything Centered**
         child: Column(
-          mainAxisAlignment:
-              MainAxisAlignment.center, // **Centered between top & bottom**
-          crossAxisAlignment:
-              CrossAxisAlignment.center, // **Centered left & right**
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             GestureDetector(
               onTap: _showImageSourceDialog,
               child: Container(
-                width: 250, // **Slightly smaller**
-                height: 250, // **Slightly smaller**
+                width: 250,
+                height: 250,
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(20),
@@ -196,7 +203,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           Icon(Icons.camera_alt, size: 40, color: Colors.white),
                           SizedBox(height: 10),
                           Text(
-                            "Click to start scan",
+                            "Click to upload photo",
                             style: TextStyle(color: Colors.white, fontSize: 14),
                           ),
                         ],
@@ -204,7 +211,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     : null,
               ),
             ),
-            const SizedBox(height: 25), // **Balanced Spacing**
+            const SizedBox(height: 25),
             SizedBox(
               width: 160,
               height: 40,
@@ -216,12 +223,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                child: const Text(
-                  "START SCAN",
-                  style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black),
+                child: Text(
+                  _hasScannedBefore ? "RESCAN" : "START SCAN", // **Dynamically change button text**
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black),
                 ),
               ),
             ),

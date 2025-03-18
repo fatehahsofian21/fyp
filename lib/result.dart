@@ -4,11 +4,13 @@ import 'dart:convert';
 class ResultScreen extends StatelessWidget {
   final String base64Image;
   final Map<String, double> detectionResults;
+  final VoidCallback onRetry;
 
   const ResultScreen({
     Key? key,
     required this.base64Image,
     required this.detectionResults,
+    required this.onRetry,
   }) : super(key: key);
 
   @override
@@ -16,27 +18,34 @@ class ResultScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFF2F4858),
       appBar: AppBar(
-        title: const Text("Scan Result"),
+        title: const Text(
+          "Scan Result",
+          style: TextStyle(color: Colors.white), // **Title in White**
+          textAlign: TextAlign.center, // **Centered Text**
+        ),
         backgroundColor: const Color(0xFF2F4858),
+        centerTitle: true, // **Centers Title in AppBar**
+        iconTheme: const IconThemeData(color: Colors.white), // **Back Arrow in White**
       ),
-      body: Center(
+      body: Center( // **Everything is Centered**
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center, // **Fully Centered**
-          crossAxisAlignment: CrossAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.center, // **Centered Between Top & Bottom**
+          crossAxisAlignment: CrossAxisAlignment.center, // **Centered Left & Right**
           children: [
             const Text(
               "Skin Cancer Detected!",
               style: TextStyle(
                 color: Colors.green,
-                fontSize: 22, // **Larger Font**
+                fontSize: 22, // **Slightly Bigger Font**
                 fontWeight: FontWeight.bold,
               ),
+              textAlign: TextAlign.center, // **Centered Text**
             ),
             const SizedBox(height: 20),
 
-            // **Bigger Image, Centered**
+            // **Bigger Image, Fully Centered**
             Container(
-              width: 220, // **Same as HomeScreen**
+              width: 220,
               height: 220,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(20),
@@ -48,16 +57,16 @@ class ResultScreen extends StatelessWidget {
             ),
 
             const SizedBox(height: 20),
+
+            // **Detection Results Fully Centered**
             Column(
               children: detectionResults.entries.map((entry) {
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4.0),
                   child: Text(
                     "${entry.key}: ${(entry.value * 100).toStringAsFixed(2)}%",
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                    ),
+                    style: const TextStyle(color: Colors.white, fontSize: 16),
+                    textAlign: TextAlign.center, // **Centered Text**
                   ),
                 );
               }).toList(),
@@ -69,10 +78,13 @@ class ResultScreen extends StatelessWidget {
             Column(
               children: [
                 SizedBox(
-                  width: 160, // **Same size as HomeScreen button**
+                  width: 160,
                   height: 40,
                   child: ElevatedButton(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () {
+                      onRetry();
+                      Navigator.pop(context);
+                    },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.grey[600], // Retry Button Color
                       shape: RoundedRectangleBorder(
@@ -83,17 +95,17 @@ class ResultScreen extends StatelessWidget {
                         style: TextStyle(fontSize: 14, color: Colors.white)),
                   ),
                 ),
-                const SizedBox(height: 15),
+                const SizedBox(height: 12), // **Reduced Spacing**
+
                 SizedBox(
-                  width: 160, // **Same size as HomeScreen button**
+                  width: 160,
                   height: 40,
                   child: ElevatedButton(
                     onPressed: () {
                       // TODO: Implement Nearest Hospitals Feature
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor:
-                          Colors.blueAccent, // Hospital Button Color
+                      backgroundColor: Colors.blueAccent, // Hospital Button Color
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
@@ -102,9 +114,10 @@ class ResultScreen extends StatelessWidget {
                         style: TextStyle(fontSize: 13, color: Colors.white)),
                   ),
                 ),
-                const SizedBox(height: 15),
+                const SizedBox(height: 12), // **Reduced Spacing**
+
                 SizedBox(
-                  width: 160, // **Same size as HomeScreen button**
+                  width: 160,
                   height: 40,
                   child: ElevatedButton(
                     onPressed: () => Navigator.pop(context),
