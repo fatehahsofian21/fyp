@@ -24,22 +24,24 @@ class _HospitalsScreenState extends State<HospitalsScreen> {
   Future<void> _fetchHospitals() async {
     try {
       Position position = await _determinePosition();
+      print("Latitude: ${position.latitude}, Longitude: ${position.longitude}"); // Debug location
 
-      const String googleApiKey = "AIzaSyBuzJjbg-b6_zsmXYX7RzQ09UEDXHirhi4";
+      // Make sure to replace this with your actual API key
+      const String googleApiKey = "AIzaSyBuzJjbg-b6_zsmXYX7RzQ09UEDXHirhi4"; 
       final url = Uri.parse(
           "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
           "?location=${position.latitude},${position.longitude}"
-          "&radius=5000"
+          "&radius=10000" // Increased radius to 10 km
           "&type=hospital"
-          "&keyword=Malaysia Hospital"
           "&key=$googleApiKey");
 
       final response = await http.get(url);
       final data = json.decode(response.body);
 
+      print("API Response: $data"); // Debug API response
+
       if (data["status"] == "OK" && data["results"].isNotEmpty) {
         List<String> hospitals = data["results"]
-            .where((item) => item["vicinity"].toString().contains("Malaysia")) // Ensure it's in Malaysia
             .map<String>((item) => item["name"].toString())
             .toList();
 
@@ -61,6 +63,7 @@ class _HospitalsScreenState extends State<HospitalsScreen> {
         _isLoading = false;
         _noHospitalsFound = true;
       });
+      print("Error fetching hospitals: $e"); // Log error for debugging
     }
   }
 

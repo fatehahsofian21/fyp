@@ -112,7 +112,8 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ).then((_) {
         setState(() {
-          _hasScannedBefore = true; // Set flag to show "RESCAN" button after returning
+          _hasScannedBefore =
+              true; // Set flag to show "RESCAN" button after returning
         });
       });
     } else {
@@ -142,31 +143,37 @@ class _HomeScreenState extends State<HomeScreen> {
           backgroundColor: const Color(0xFF2F4858),
           elevation: 0,
           flexibleSpace: Padding(
-            padding: const EdgeInsets.only(left: 10.0, right: 5.0, top: 45),
+            padding: const EdgeInsets.only(left: 10.0, right: 10.0, top: 45),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+                // Left section with logo and greeting
                 Row(
                   children: [
-                    Image.asset('assets/a.png', width: 70),
-                    const SizedBox(width: 5),
+                    Image.asset('assets/a.png', width: 50),
+                    const SizedBox(width: 0),
                     _isLoading
                         ? const CircularProgressIndicator(color: Colors.white)
                         : Text(
                             "Welcome back, $_userName!",
-                            style: const TextStyle(color: Colors.white, fontSize: 18),
+                            style: const TextStyle(
+                                color: Colors.white, fontSize: 18),
                           ),
                   ],
                 ),
+                // Right section with premium and notification icons close to each other
                 Row(
+                  mainAxisSize:
+                      MainAxisSize.min, // Use minimum space to prevent overflow
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.diamond_outlined, color: Colors.white),
+                      icon: const Icon(Icons.diamond_outlined,
+                          color: Colors.white, size: 22), // Reduced size
                       onPressed: () {},
                     ),
-                    const SizedBox(width: 3),
                     IconButton(
-                      icon: const Icon(Icons.notifications_outlined, color: Colors.white),
+                      icon: const Icon(Icons.notifications_outlined,
+                          color: Colors.white, size: 24), // Reduced size
                       onPressed: () {},
                     ),
                   ],
@@ -224,8 +231,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 child: Text(
-                  _hasScannedBefore ? "RESCAN" : "START SCAN", // **Dynamically change button text**
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black),
+                  _hasScannedBefore
+                      ? "RESCAN"
+                      : "START SCAN", // **Dynamically change button text**
+                  style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black),
                 ),
               ),
             ),
