@@ -33,6 +33,9 @@ dependencies:
   # Location & API fetching for nearest hospitals
   geolocator: ^10.1.0  # 📍 Get user’s live GPS location
 
+  # Shared Preferences for saving scan history
+  shared_preferences: ^2.0.8  # 📝 Save scan history locally
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

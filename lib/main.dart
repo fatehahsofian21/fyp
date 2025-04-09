@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart'; // ✅ Import Geolocator
 import 'login.dart'; // Import your login screen
+import 'history.dart'; // Import HistoryScreen
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized(); // Ensures Flutter is ready
@@ -53,6 +54,13 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
       ),
       home: const LoginScreen(), // Start with Login Screen
+
+      // Define the routes, including passing data dynamically
+      routes: {
+        '/history': (context) => HistoryScreen(
+              detectionResults: ModalRoute.of(context)!.settings.arguments as Map<String, double>,
+            ), // Navigate to HistoryScreen with detectionResults
+      },
     );
   }
 }

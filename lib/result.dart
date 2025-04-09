@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'home.dart'; // Import HomeScreen
 import 'hospitals.dart'; // Import HospitalsScreen
 
@@ -15,6 +16,19 @@ class ResultScreen extends StatelessWidget {
     required this.onRetry,
   }) : super(key: key);
 
+  // Function to save results to SharedPreferences
+  Future<void> _saveToHistory(Map<String, double> results) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    List<String> historyList = prefs.getStringList('scan_history') ?? [];
+
+    // Convert the results into a string to store in SharedPreferences
+    String resultString = json.encode(results);
+    historyList.add(resultString);
+
+    // Save the updated history list to SharedPreferences
+    prefs.setStringList('scan_history', historyList);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -27,6 +41,16 @@ class ResultScreen extends StatelessWidget {
         backgroundColor: const Color(0xFF2F4858),
         centerTitle: true,
         iconTheme: const IconThemeData(color: Colors.white),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (context) => const HomeScreen()),
+              (Route<dynamic> route) => false, // Removes all previous routes
+            );
+          },
+        ),
       ),
       body: Center(
         child: Column(
@@ -44,7 +68,7 @@ class ResultScreen extends StatelessWidget {
             ),
             const SizedBox(height: 20),
 
-            // **Display Image**
+            // Display Image
             Container(
               width: 220,
               height: 220,
@@ -59,7 +83,7 @@ class ResultScreen extends StatelessWidget {
 
             const SizedBox(height: 20),
 
-            // **Detection Results**
+            // Display Detection Results
             Column(
               children: detectionResults.entries.map((entry) {
                 return Padding(
@@ -75,10 +99,10 @@ class ResultScreen extends StatelessWidget {
 
             const SizedBox(height: 30),
 
-            // **Buttons**
+            // Buttons
             Column(
               children: [
-                // **Retry Button**
+                // Retry Button
                 SizedBox(
                   width: 160,
                   height: 40,
@@ -99,7 +123,34 @@ class ResultScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
 
-                // **Nearest Hospitals Button**
+                // Save to History Button
+                SizedBox(
+                  width: 160,
+                  height: 40,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      // Save the results to SharedPreferences
+                      _saveToHistory(detectionResults);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text("Scan saved to history."),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orangeAccent,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: const Text("Save to History",
+                        style: TextStyle(fontSize: 13, color: Colors.white)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Nearest Hospitals Button
                 SizedBox(
                   width: 160,
                   height: 40,
@@ -124,7 +175,7 @@ class ResultScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
 
-                // **Done Button** (Navigates back to HomeScreen)
+                // Done Button (Navigates back to HomeScreen)
                 SizedBox(
                   width: 160,
                   height: 40,
