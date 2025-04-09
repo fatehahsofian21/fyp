@@ -24,10 +24,11 @@ class _HospitalsScreenState extends State<HospitalsScreen> {
   Future<void> _fetchHospitals() async {
     try {
       Position position = await _determinePosition();
-      print("Latitude: ${position.latitude}, Longitude: ${position.longitude}"); // Debug location
+      print(
+          "Latitude: ${position.latitude}, Longitude: ${position.longitude}"); // Debug location
 
       // Make sure to replace this with your actual API key
-      const String googleApiKey = "AIzaSyBuzJjbg-b6_zsmXYX7RzQ09UEDXHirhi4"; 
+      const String googleApiKey = "AIzaSyBuzJjbg-b6_zsmXYX7RzQ09UEDXHirhi4";
       final url = Uri.parse(
           "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
           "?location=${position.latitude},${position.longitude}"
@@ -126,8 +127,8 @@ class _HospitalsScreenState extends State<HospitalsScreen> {
                         ),
                         child: Text(
                           _hospitalList[index],
-                          style:
-                              const TextStyle(color: Colors.white, fontSize: 16),
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 16),
                         ),
                       ),
                     );

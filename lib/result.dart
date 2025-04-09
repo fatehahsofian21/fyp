@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
+import 'home.dart'; // Import HomeScreen
 import 'hospitals.dart'; // Import HospitalsScreen
 
 class ResultScreen extends StatelessWidget {
@@ -123,12 +124,18 @@ class ResultScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
 
-                // **Done Button**
+                // **Done Button** (Navigates back to HomeScreen)
                 SizedBox(
                   width: 160,
                   height: 40,
                   child: ElevatedButton(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () {
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(builder: (context) => const HomeScreen()),
+                        (Route<dynamic> route) => false, // Removes all previous routes
+                      );
+                    },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
                       shape: RoundedRectangleBorder(
