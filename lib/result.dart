@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'home.dart'; // Import HomeScreen
 import 'hospitals.dart'; // Import HospitalsScreen
 
@@ -16,17 +17,30 @@ class ResultScreen extends StatelessWidget {
     required this.onRetry,
   }) : super(key: key);
 
-  // Function to save results to SharedPreferences
-  Future<void> _saveToHistory(Map<String, double> results) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    List<String> historyList = prefs.getStringList('scan_history') ?? [];
+  // Function to save results and image to Firebase
+  Future<void> _saveToFirebase(Map<String, dynamic> results) async {
+    try {
+      // Get the current logged-in user
+      User? user = FirebaseAuth.instance.currentUser;
 
-    // Convert the results into a string to store in SharedPreferences
-    String resultString = json.encode(results);
-    historyList.add(resultString);
+      if (user != null) {
+        // Generate a unique ID for the scan result
+        String scanId = DateTime.now().millisecondsSinceEpoch.toString();
 
-    // Save the updated history list to SharedPreferences
-    prefs.setStringList('scan_history', historyList);
+        // Store the scan result in Firebase Firestore under 'scan_results' collection
+        await FirebaseFirestore.instance.collection('scan_results').add({
+          'userId': user.uid,
+          'scanId': scanId,
+          'detectionResults': results,
+          'image': results['image'], // Store the base64 encoded image
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+
+        print("Scan result saved to Firebase.");
+      }
+    } catch (e) {
+      print("Error saving scan to Firebase: $e");
+    }
   }
 
   @override
@@ -123,33 +137,6 @@ class ResultScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
 
-                // Save to History Button
-                SizedBox(
-                  width: 160,
-                  height: 40,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      // Save the results to SharedPreferences
-                      _saveToHistory(detectionResults);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text("Scan saved to history."),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orangeAccent,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    child: const Text("Save to History",
-                        style: TextStyle(fontSize: 13, color: Colors.white)),
-                  ),
-                ),
-                const SizedBox(height: 12),
-
                 // Nearest Hospitals Button
                 SizedBox(
                   width: 160,
@@ -181,6 +168,13 @@ class ResultScreen extends StatelessWidget {
                   height: 40,
                   child: ElevatedButton(
                     onPressed: () {
+                      // Save the result and image to Firebase when done
+                      _saveToFirebase({
+                        'image': base64Image,
+                        'Basal Cell Carcinoma': detectionResults['Basal Cell Carcinoma'],
+                        'Squamous Cell Carcinoma': detectionResults['Squamous Cell Carcinoma'],
+                      });
+
                       Navigator.pushAndRemoveUntil(
                         context,
                         MaterialPageRoute(builder: (context) => const HomeScreen()),

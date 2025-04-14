@@ -4,8 +4,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'dart:convert';
-
-import 'result.dart'; // Import the result page
+import 'result.dart'; // Import ResultScreen
+import 'history.dart'; // Import HistoryScreen
+import 'profile.dart'; // Import ProfileScreen
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -15,11 +16,13 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  String _userName = "User";
+  String _userName = "User"; // Default value for user's name
   bool _isLoading = true;
   File? _selectedImage;
   String? _base64Image;
-  bool _hasScannedBefore = false; // Track if user has scanned before
+  bool _hasScannedBefore = false;
+
+  int _selectedIndex = 0;
 
   @override
   void initState() {
@@ -27,6 +30,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _fetchUserName();
   }
 
+  // Fetch the user's name from Firebase
   Future<void> _fetchUserName() async {
     try {
       User? user = FirebaseAuth.instance.currentUser;
@@ -36,13 +40,18 @@ class _HomeScreenState extends State<HomeScreen> {
             .doc(user.uid)
             .get();
 
-        String fullName = userDoc["name"] ?? "User";
-        String firstName = fullName.split(" ")[0];
+        String fullName = userDoc["name"] ?? "User"; // Get full name or default to "User"
+        String firstName = fullName.split(" ")[0]; // Extract first name
 
         setState(() {
-          _userName = firstName;
+          _userName = firstName; // Set the first name
           _isLoading = false;
         });
+      } else {
+        setState(() {
+          _isLoading = false;
+        });
+        print("No user logged in.");
       }
     } catch (e) {
       setState(() {
@@ -52,6 +61,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // Pick image from gallery or camera
   Future<void> _pickImage(ImageSource source) async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: source);
@@ -68,6 +78,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // Show bottom sheet for image source selection
   void _showImageSourceDialog() {
     showModalBottomSheet(
       context: context,
@@ -96,41 +107,58 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // Start scan process
   void _startScan() {
     if (_selectedImage != null && _base64Image != null) {
+      final detectionResults = {
+        "Basal Cell Carcinoma": 0.95,
+        "Squamous Cell Carcinoma": 0.05,
+      };
+
       Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => ResultScreen(
             base64Image: _base64Image!,
-            detectionResults: {
-              "Basal Cell Carcinoma": 0.95,
-              "Squamous Cell Carcinoma": 0.05,
-            },
-            onRetry: _resetImage, // Clear image when retrying
+            detectionResults: detectionResults,
+            onRetry: _resetImage,
           ),
         ),
       ).then((_) {
         setState(() {
-          _hasScannedBefore =
-              true; // Set flag to show "RESCAN" button after returning
+          _hasScannedBefore = true;
         });
       });
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Please select an image first!"),
-          backgroundColor: Colors.red,
-        ),
+        const SnackBar(content: Text("Please select an image first!")),
       );
     }
   }
 
+  // Reset the selected image
   void _resetImage() {
     setState(() {
       _selectedImage = null;
       _base64Image = null;
     });
+  }
+
+  // Handle BottomNavigationBar taps
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+
+    // Navigate to Profile screen when profile tab is tapped
+    if (index == 2) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const ProfileScreen(), // Navigate to ProfileScreen
+        ),
+      );
+    }
   }
 
   @override
@@ -147,7 +175,6 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Left section with logo and greeting
                 Row(
                   children: [
                     Image.asset('assets/a.png', width: 50),
@@ -155,25 +182,20 @@ class _HomeScreenState extends State<HomeScreen> {
                     _isLoading
                         ? const CircularProgressIndicator(color: Colors.white)
                         : Text(
-                            "Welcome back, $_userName!",
-                            style: const TextStyle(
-                                color: Colors.white, fontSize: 18),
+                            "Welcome back, $_userName!", // Display first name
+                            style: const TextStyle(color: Colors.white, fontSize: 18),
                           ),
                   ],
                 ),
-                // Right section with premium and notification icons close to each other
                 Row(
-                  mainAxisSize:
-                      MainAxisSize.min, // Use minimum space to prevent overflow
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.diamond_outlined,
-                          color: Colors.white, size: 22), // Reduced size
+                      icon: const Icon(Icons.diamond_outlined, color: Colors.white, size: 22),
                       onPressed: () {},
                     ),
                     IconButton(
-                      icon: const Icon(Icons.notifications_outlined,
-                          color: Colors.white, size: 24), // Reduced size
+                      icon: const Icon(Icons.notifications_outlined, color: Colors.white, size: 24),
                       onPressed: () {},
                     ),
                   ],
@@ -197,10 +219,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: Colors.white.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(20),
                   image: _selectedImage != null
-                      ? DecorationImage(
-                          image: FileImage(_selectedImage!),
-                          fit: BoxFit.cover,
-                        )
+                      ? DecorationImage(image: FileImage(_selectedImage!), fit: BoxFit.cover)
                       : null,
                 ),
                 child: _selectedImage == null
@@ -209,10 +228,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         children: [
                           Icon(Icons.camera_alt, size: 40, color: Colors.white),
                           SizedBox(height: 10),
-                          Text(
-                            "Click to upload photo",
-                            style: TextStyle(color: Colors.white, fontSize: 14),
-                          ),
+                          Text("Click to upload photo", style: TextStyle(color: Colors.white, fontSize: 14)),
                         ],
                       )
                     : null,
@@ -226,18 +242,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 onPressed: _startScan,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFD6C3B8),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
                 child: Text(
-                  _hasScannedBefore
-                      ? "RESCAN"
-                      : "START SCAN", // **Dynamically change button text**
-                  style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black),
+                  _hasScannedBefore ? "RESCAN" : "START SCAN",
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black),
                 ),
               ),
             ),
@@ -245,22 +254,15 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: _onItemTapped,
         backgroundColor: Colors.white.withOpacity(0.2),
         selectedItemColor: Colors.white,
         unselectedItemColor: Colors.white70,
         items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: "Home",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.history),
-            label: "History",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: "Profile",
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
+          BottomNavigationBarItem(icon: Icon(Icons.history), label: "History"),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"), // Added Profile
         ],
       ),
     );
