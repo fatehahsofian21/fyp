@@ -35,6 +35,7 @@ dependencies:
 
   # Shared Preferences for saving scan history
   shared_preferences: ^2.0.8  # 📝 Save scan history locally
+  google_generative_ai: ^0.4.6
 
 dev_dependencies:
   flutter_test:

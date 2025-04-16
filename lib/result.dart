@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 import 'dart:convert';
+import 'package:http/http.dart' as http; // Add this line for HTTP requests
 import 'home.dart'; // Import HomeScreen
 import 'hospitals.dart'; // Import HospitalsScreen
 
@@ -20,27 +23,80 @@ class ResultScreen extends StatelessWidget {
   // Function to save results and image to Firebase
   Future<void> _saveToFirebase(Map<String, dynamic> results) async {
     try {
-      // Get the current logged-in user
       User? user = FirebaseAuth.instance.currentUser;
 
       if (user != null) {
-        // Generate a unique ID for the scan result
         String scanId = DateTime.now().millisecondsSinceEpoch.toString();
-
-        // Store the scan result in Firebase Firestore under 'scan_results' collection
         await FirebaseFirestore.instance.collection('scan_results').add({
           'userId': user.uid,
           'scanId': scanId,
           'detectionResults': results,
-          'image': results['image'], // Store the base64 encoded image
+          'image': results['image'],
           'createdAt': FieldValue.serverTimestamp(),
         });
-
         print("Scan result saved to Firebase.");
       }
     } catch (e) {
       print("Error saving scan to Firebase: $e");
     }
+  }
+
+  // Function to fetch the nearest hospital from Gemini API with generation config
+  Future<String> _fetchNearestHospitalFromGemini() async {
+    try {
+      const String apiUrl =
+          'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=AIzaSyBagQghwNUOVdoRg7zwxXfaH-2MT61Pbvs';
+
+      // Generation config settings
+      final Map<String, dynamic> generationConfig = {
+        'temperature': 1,
+        'top_p': 0.95,
+        'top_k': 40,
+        'max_output_tokens': 8192,
+        'response_mime_type': 'text/plain',
+      };
+
+      final Map<String, dynamic> requestBody = {
+        'messages': [
+          {
+            'role': 'user',
+            'content': 'Please provide the nearest hospital to my location.'
+          }
+        ],
+        'generation_config': generationConfig, // Add the generation config here
+      };
+
+      final response = await http.post(
+        Uri.parse(apiUrl),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: json.encode(requestBody),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        print(data);
+        return "Nearest Hospital: ${data['choices'][0]['message']['content']}";
+      } else {
+        return "Error fetching nearest hospital data: ${response.statusCode}. ${response.body}";
+      }
+    } catch (e) {
+      print(e);
+      return "Error fetching nearest hospital data: $e";
+    }
+  }
+
+  // Function to handle the button click and fetch nearest hospital
+  Future<void> _getLocationAndFetchHospital(BuildContext context) async {
+    String nearestHospital = await _fetchNearestHospitalFromGemini();
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => HospitalsScreen(nearestHospital: nearestHospital),
+      ),
+    );
   }
 
   @override
@@ -61,7 +117,7 @@ class ResultScreen extends StatelessWidget {
             Navigator.pushAndRemoveUntil(
               context,
               MaterialPageRoute(builder: (context) => const HomeScreen()),
-              (Route<dynamic> route) => false, // Removes all previous routes
+              (Route<dynamic> route) => false,
             );
           },
         ),
@@ -69,7 +125,6 @@ class ResultScreen extends StatelessWidget {
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             const Text(
               "Skin Cancer Detected!",
@@ -81,8 +136,6 @@ class ResultScreen extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 20),
-
-            // Display Image
             Container(
               width: 220,
               height: 220,
@@ -94,10 +147,7 @@ class ResultScreen extends StatelessWidget {
                 ),
               ),
             ),
-
             const SizedBox(height: 20),
-
-            // Display Detection Results
             Column(
               children: detectionResults.entries.map((entry) {
                 return Padding(
@@ -110,13 +160,9 @@ class ResultScreen extends StatelessWidget {
                 );
               }).toList(),
             ),
-
             const SizedBox(height: 30),
-
-            // Buttons
             Column(
               children: [
-                // Retry Button
                 SizedBox(
                   width: 160,
                   height: 40,
@@ -143,12 +189,7 @@ class ResultScreen extends StatelessWidget {
                   height: 40,
                   child: ElevatedButton(
                     onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const HospitalsScreen(),
-                        ),
-                      );
+                      _getLocationAndFetchHospital(context);
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blueAccent,
@@ -162,23 +203,24 @@ class ResultScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
 
-                // Done Button (Navigates back to HomeScreen)
                 SizedBox(
                   width: 160,
                   height: 40,
                   child: ElevatedButton(
                     onPressed: () {
-                      // Save the result and image to Firebase when done
                       _saveToFirebase({
                         'image': base64Image,
-                        'Basal Cell Carcinoma': detectionResults['Basal Cell Carcinoma'],
-                        'Squamous Cell Carcinoma': detectionResults['Squamous Cell Carcinoma'],
+                        'Basal Cell Carcinoma':
+                            detectionResults['Basal Cell Carcinoma'],
+                        'Squamous Cell Carcinoma':
+                            detectionResults['Squamous Cell Carcinoma'],
                       });
 
                       Navigator.pushAndRemoveUntil(
                         context,
-                        MaterialPageRoute(builder: (context) => const HomeScreen()),
-                        (Route<dynamic> route) => false, // Removes all previous routes
+                        MaterialPageRoute(
+                            builder: (context) => const HomeScreen()),
+                        (Route<dynamic> route) => false,
                       );
                     },
                     style: ElevatedButton.styleFrom(
