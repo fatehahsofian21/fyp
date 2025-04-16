@@ -115,6 +115,7 @@ class _HomeScreenState extends State<HomeScreen> {
         "Squamous Cell Carcinoma": 0.05,
       };
 
+      // Navigate to ResultScreen after scanning
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -156,6 +157,21 @@ class _HomeScreenState extends State<HomeScreen> {
         context,
         MaterialPageRoute(
           builder: (context) => const ProfileScreen(), // Navigate to ProfileScreen
+        ),
+      );
+    }
+
+    // Navigate to History screen when history tab is tapped
+    if (index == 1) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => HistoryScreen(
+            detectionResults: {
+              "Basal Cell Carcinoma": 0.95,
+              "Squamous Cell Carcinoma": 0.05,
+            }, // Pass the results to history screen
+          ),
         ),
       );
     }
@@ -239,7 +255,7 @@ class _HomeScreenState extends State<HomeScreen> {
               width: 160,
               height: 40,
               child: ElevatedButton(
-                onPressed: _startScan,
+                onPressed: _startScan, // Trigger the start scan action
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFD6C3B8),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),

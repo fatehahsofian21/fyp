@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'login.dart'; // Import the LoginScreen
-import 'home.dart'; // Import HomeScreen
+import 'dart:math';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'login.dart'; // Correctly import your LoginScreen
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -16,51 +16,71 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   String _userName = "User";
   String _email = "";
-  String _phone = "";
+  String _phone = "+60-123456789";  // Random phone number starting with +60
   String _gender = "Male"; // Default gender
   File? _selectedImage;
 
   bool _isLoading = true;
-  final _picker = ImagePicker();
+
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _genderController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _fetchUserProfile();
+    _loadStoredData();  // Load stored data
   }
 
- Future<void> _fetchUserProfile() async {
-  User? user = FirebaseAuth.instance.currentUser;
-  if (user != null) {
-    DocumentSnapshot userDoc = await FirebaseFirestore.instance
-        .collection("users")
-        .doc(user.uid)
-        .get();
-    
-    setState(() {
-      _userName = userDoc["name"] ?? "User"; // Ensure the name field is fetched correctly
-      _email = userDoc["email"] ?? "";
-      _phone = userDoc["phone"] ?? ""; // Use empty string if phone is not available
-      _gender = userDoc["gender"] ?? "Male"; // Default to "Male" if gender is missing
-      _isLoading = false;
-    });
+  // Fetch user profile from Firebase (only email)
+  Future<void> _fetchUserProfile() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      setState(() {
+        _email = user.email ?? "";
+        _userName = _email.split('@')[0]; // Extract the first name from email (before @)
+        _phone = "+60-${_generateRandomPhoneNumber()}"; // Generate random phone number
+        _isLoading = false;
+      });
+    }
   }
-}
 
+  // Generate a random phone number starting with +60-
+  String _generateRandomPhoneNumber() {
+    Random random = Random();
+    String randomDigits = List.generate(8, (index) => random.nextInt(10).toString()).join('');
+    return randomDigits;
+  }
 
+  // Pick image logic (optional)
   Future<void> _pickImage() async {
-    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+    final pickedFile = await ImagePicker().pickImage(source: ImageSource.gallery);
     if (pickedFile != null) {
       setState(() {
         _selectedImage = File(pickedFile.path);
       });
-      // Upload the image to Firebase Storage (optional) or process it
     }
+  }
+
+  // Save the user information to SharedPreferences
+  Future<void> _saveUserData() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    prefs.setString('phone', _phone);
+    prefs.setString('gender', _gender);
+  }
+
+  // Load the user information from SharedPreferences
+  Future<void> _loadStoredData() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _phone = prefs.getString('phone') ?? "+60-123456789"; // Default phone if none saved
+      _gender = prefs.getString('gender') ?? "Male"; // Default gender if none saved
+    });
   }
 
   // Logout function
   void _logout() {
-    FirebaseAuth.instance.signOut();
+    FirebaseAuth.instance.signOut(); // Sign out from Firebase
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (context) => const LoginScreen()), // Navigate to LoginScreen
@@ -83,9 +103,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // Profile Picture
+                  // Profile Picture (Editable with pencil icon)
                   GestureDetector(
-                    onTap: _pickImage,
+                    onTap: _pickImage, // Handle image picker logic
                     child: CircleAvatar(
                       radius: 60,
                       backgroundImage: _selectedImage != null
@@ -112,30 +132,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(height: 10),
 
-                  // Display Phone Number
+                  // Display Phone Number (Editable)
                   Row(
                     children: [
                       const Icon(Icons.phone, color: Colors.white),
                       const SizedBox(width: 8),
                       Text(
-                        'Phone: $_phone',
+                        'Phone: $_phone', // Display the randomly generated phone number
                         style: const TextStyle(fontSize: 16, color: Colors.white),
                       ),
                     ],
                   ),
                   const SizedBox(height: 10),
 
-                  // Gender Dropdown
+                  // Gender Dropdown (Editable)
                   Row(
                     children: [
                       const Icon(Icons.transgender, color: Colors.white),
                       const SizedBox(width: 8),
                       DropdownButton<String>(
                         value: _gender,
+                        dropdownColor: const Color(0xFF2F4858),
+                        style: const TextStyle(color: Colors.black), // Set selected text color to black
                         onChanged: (String? newValue) {
                           setState(() {
                             _gender = newValue!;
                           });
+                          _saveUserData(); // Save the updated gender
                         },
                         items: <String>['Male', 'Female']
                             .map<DropdownMenuItem<String>>((String value) {
@@ -147,7 +170,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 30),
 
                   // Logout Button
