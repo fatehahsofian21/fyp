@@ -3,8 +3,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:geolocator/geolocator.dart'; // Import Geolocator
 import 'home.dart'; // Import HomeScreen
 import 'hospitals.dart'; // Import HospitalsScreen
+import 'dart:ui'as ui; 
 
 class ResultScreen extends StatelessWidget {
   final String base64Image;
@@ -39,17 +41,36 @@ class ResultScreen extends StatelessWidget {
     }
   }
 
-  // Function to fetch the nearest hospital from Gemini API with generation config
-  Future<String> _fetchNearestHospitalFromGemini() async {
+  // Function to get the current user's location
+  Future<Position> _getCurrentLocation() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    // Check if location services are enabled
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      return Future.error('Location services are disabled.');
+    }
+
+    // Check if permission is granted
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission != LocationPermission.whileInUse && permission != LocationPermission.always) {
+        return Future.error('Location permission denied');
+      }
+    }
+
+    // Get the current position (latitude and longitude)
+    return await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+  }
+
+  // Function to fetch the nearest hospitals using Gemini API
+Future<String> _fetchNearestHospitalFromGemini(double latitude, double longitude) async {
   try {
     const String apiUrl =
         'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=AIzaSyBagQghwNUOVdoRg7zwxXfaH-2MT61Pbvs';
 
-    // User's latitude and longitude (replace with actual values or get from location service)
-    double latitude = 3.139003;  // Example latitude
-    double longitude = 101.6869;  // Example longitude
-
-    // Adjusted generation config settings
     final Map<String, dynamic> generationConfig = {
       'temperature': 1,
       'top_p': 0.95,
@@ -64,7 +85,7 @@ class ResultScreen extends StatelessWidget {
           "parts": [
             {
               "text":
-                  "Please provide the nearest hospital to my location. My coordinates are latitude: $latitude and longitude: $longitude. Please find hospitals within 200km."
+                  "Please provide a list of hospitals within a 20km radius of the following coordinates: latitude: $latitude, longitude: $longitude. List only 5 hospitals. Do not include any extra text or symbols."
             },
             {
               "inlineData": {
@@ -86,17 +107,22 @@ class ResultScreen extends StatelessWidget {
       body: json.encode(requestBody),
     );
 
-    // Log the full response for debugging
-    print("API Response: ${response.body}");
-
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
-      // Check if the response contains the expected data
       if (data['candidates'] != null && data['candidates'].isNotEmpty) {
-        // Extract hospital details from the response
-        final String hospitalData =
-            data['candidates'][0]['content']['parts'][0]['text'] ?? 'No data available';
-        return "Nearest Hospital: $hospitalData";
+        final List<dynamic> parts = data['candidates'][0]['content']['parts'];
+        final List<String> hospitals = [];
+
+        // Get only hospital names (ignore extra text)
+        for (var part in parts) {
+          if (part['text'] != null) {
+            final hospitalsText = part['text'].toString().split('\n');
+            hospitals.addAll(hospitalsText);
+            if (hospitals.length >= 5) break; // Limit to 5 hospitals
+          }
+        }
+
+        return hospitals.join('\n'); // Return hospital names as a list
       } else {
         return "Error: No valid data returned from the API.";
       }
@@ -111,14 +137,20 @@ class ResultScreen extends StatelessWidget {
 
   // Function to handle the button click and fetch nearest hospital
   Future<void> _getLocationAndFetchHospital(BuildContext context) async {
-    String nearestHospital = await _fetchNearestHospitalFromGemini();
+    try {
+      Position position = await _getCurrentLocation();
+      String nearestHospital = await _fetchNearestHospitalFromGemini(position.latitude, position.longitude);
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => HospitalsScreen(nearestHospital: nearestHospital),
-      ),
-    );
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => HospitalsScreen(nearestHospital: nearestHospital),
+        ),
+      );
+    } catch (e) {
+      print("Error getting location: $e");
+      // Handle location error (e.g., show a message)
+    }
   }
 
   @override
