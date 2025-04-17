@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:image_picker/image_picker.dart';
-import 'dart:io';
 import 'dart:convert';
-import 'package:http/http.dart' as http; // Add this line for HTTP requests
+import 'package:http/http.dart' as http;
 import 'home.dart'; // Import HomeScreen
 import 'hospitals.dart'; // Import HospitalsScreen
 
@@ -43,49 +41,73 @@ class ResultScreen extends StatelessWidget {
 
   // Function to fetch the nearest hospital from Gemini API with generation config
   Future<String> _fetchNearestHospitalFromGemini() async {
-    try {
-      const String apiUrl =
-          'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=AIzaSyBagQghwNUOVdoRg7zwxXfaH-2MT61Pbvs';
+  try {
+    const String apiUrl =
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=AIzaSyBagQghwNUOVdoRg7zwxXfaH-2MT61Pbvs';
 
-      // Generation config settings
-      final Map<String, dynamic> generationConfig = {
-        'temperature': 1,
-        'top_p': 0.95,
-        'top_k': 40,
-        'max_output_tokens': 8192,
-        'response_mime_type': 'text/plain',
-      };
+    // User's latitude and longitude (replace with actual values or get from location service)
+    double latitude = 3.139003;  // Example latitude
+    double longitude = 101.6869;  // Example longitude
 
-      final Map<String, dynamic> requestBody = {
-        'messages': [
-          {
-            'role': 'user',
-            'content': 'Please provide the nearest hospital to my location.'
-          }
-        ],
-        'generation_config': generationConfig, // Add the generation config here
-      };
+    // Adjusted generation config settings
+    final Map<String, dynamic> generationConfig = {
+      'temperature': 1,
+      'top_p': 0.95,
+      'top_k': 40,
+      'max_output_tokens': 8192,
+      'response_mime_type': 'text/plain',
+    };
 
-      final response = await http.post(
-        Uri.parse(apiUrl),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: json.encode(requestBody),
-      );
+    final Map<String, dynamic> requestBody = {
+      "contents": [
+        {
+          "parts": [
+            {
+              "text":
+                  "Please provide the nearest hospital to my location. My coordinates are latitude: $latitude and longitude: $longitude. Please find hospitals within 200km."
+            },
+            {
+              "inlineData": {
+                "mimeType": "image/jpeg",
+                "data": base64Image, // Send the base64 image here
+              }
+            }
+          ]
+        }
+      ],
+      "generationConfig": generationConfig,
+    };
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        print(data);
-        return "Nearest Hospital: ${data['choices'][0]['message']['content']}";
+    final response = await http.post(
+      Uri.parse(apiUrl),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: json.encode(requestBody),
+    );
+
+    // Log the full response for debugging
+    print("API Response: ${response.body}");
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      // Check if the response contains the expected data
+      if (data['candidates'] != null && data['candidates'].isNotEmpty) {
+        // Extract hospital details from the response
+        final String hospitalData =
+            data['candidates'][0]['content']['parts'][0]['text'] ?? 'No data available';
+        return "Nearest Hospital: $hospitalData";
       } else {
-        return "Error fetching nearest hospital data: ${response.statusCode}. ${response.body}";
+        return "Error: No valid data returned from the API.";
       }
-    } catch (e) {
-      print(e);
-      return "Error fetching nearest hospital data: $e";
+    } else {
+      return "Error fetching nearest hospital data: ${response.statusCode}. ${response.body}";
     }
+  } catch (e) {
+    print(e);
+    return "Error fetching nearest hospital data: $e";
   }
+}
 
   // Function to handle the button click and fetch nearest hospital
   Future<void> _getLocationAndFetchHospital(BuildContext context) async {

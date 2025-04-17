@@ -25,7 +25,7 @@ class HospitalsScreen extends StatelessWidget {
           children: [
             Text(
               nearestHospital, // Display the nearest hospital passed from ResultScreen
-              style: const TextStyle(color: Colors.white, fontSize: 20),
+              style: const TextStyle(color: Colors.white, fontSize: 15),
             ),
             const SizedBox(height: 20),
           ],
