@@ -6,14 +6,15 @@ import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart'; // Import Geolocator
 import 'home.dart'; // Import HomeScreen
 import 'hospitals.dart'; // Import HospitalsScreen
-import 'dart:ui'as ui; 
+import 'dart:ui' as ui;
 
 class ResultScreen extends StatelessWidget {
   final String base64Image;
   final Map<String, double> detectionResults;
   final VoidCallback onRetry;
 
-  const ResultScreen({
+  // Constructor without const, as you're passing runtime values
+  ResultScreen({
     Key? key,
     required this.base64Image,
     required this.detectionResults,
@@ -65,75 +66,75 @@ class ResultScreen extends StatelessWidget {
     return await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
   }
 
-  // Function to fetch the nearest hospitals using Gemini API
-Future<String> _fetchNearestHospitalFromGemini(double latitude, double longitude) async {
-  try {
-    const String apiUrl =
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=AIzaSyBagQghwNUOVdoRg7zwxXfaH-2MT61Pbvs';
+  // Function to fetch the nearest hospital from Gemini API with generation config
+  Future<String> _fetchNearestHospitalFromGemini(double latitude, double longitude) async {
+    try {
+      const String apiUrl =
+          'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=AIzaSyBagQghwNUOVdoRg7zwxXfaH-2MT61Pbvs';
 
-    final Map<String, dynamic> generationConfig = {
-      'temperature': 1,
-      'top_p': 0.95,
-      'top_k': 40,
-      'max_output_tokens': 8192,
-      'response_mime_type': 'text/plain',
-    };
+      final Map<String, dynamic> generationConfig = {
+        'temperature': 1,
+        'top_p': 0.95,
+        'top_k': 40,
+        'max_output_tokens': 8192,
+        'response_mime_type': 'text/plain',
+      };
 
-    final Map<String, dynamic> requestBody = {
-      "contents": [
-        {
-          "parts": [
-            {
-              "text":
-                  "Please provide a list of hospitals within a 20km radius of the following coordinates: latitude: $latitude, longitude: $longitude. List only 5 hospitals. Do not include any extra text or symbols."
-            },
-            {
-              "inlineData": {
-                "mimeType": "image/jpeg",
-                "data": base64Image, // Send the base64 image here
+      final Map<String, dynamic> requestBody = {
+        "contents": [
+          {
+            "parts": [
+              {
+                "text":
+                    "Please provide a list of hospitals within a 10km radius of the following coordinates: latitude: $latitude, longitude: $longitude. List only 1 hospital. Do not include any extra text or symbols."
+              },
+              {
+                "inlineData": {
+                  "mimeType": "image/jpeg",
+                  "data": base64Image, // Send the base64 image here
+                }
               }
-            }
-          ]
-        }
-      ],
-      "generationConfig": generationConfig,
-    };
-
-    final response = await http.post(
-      Uri.parse(apiUrl),
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: json.encode(requestBody),
-    );
-
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      if (data['candidates'] != null && data['candidates'].isNotEmpty) {
-        final List<dynamic> parts = data['candidates'][0]['content']['parts'];
-        final List<String> hospitals = [];
-
-        // Get only hospital names (ignore extra text)
-        for (var part in parts) {
-          if (part['text'] != null) {
-            final hospitalsText = part['text'].toString().split('\n');
-            hospitals.addAll(hospitalsText);
-            if (hospitals.length >= 5) break; // Limit to 5 hospitals
+            ]
           }
-        }
+        ],
+        "generationConfig": generationConfig,
+      };
 
-        return hospitals.join('\n'); // Return hospital names as a list
+      final response = await http.post(
+        Uri.parse(apiUrl),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: json.encode(requestBody),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['candidates'] != null && data['candidates'].isNotEmpty) {
+          final List<dynamic> parts = data['candidates'][0]['content']['parts'];
+          final List<String> hospitals = [];
+
+          // Get only hospital names (ignore extra text)
+          for (var part in parts) {
+            if (part['text'] != null) {
+              final hospitalsText = part['text'].toString().split('\n');
+              hospitals.addAll(hospitalsText);
+              if (hospitals.length >= 1) break; // Limit to 1 hospital
+            }
+          }
+
+          return hospitals.join('\n'); // Return hospital names as a list
+        } else {
+          return "Error: No valid data returned from the API.";
+        }
       } else {
-        return "Error: No valid data returned from the API.";
+        return "Error fetching nearest hospital data: ${response.statusCode}. ${response.body}";
       }
-    } else {
-      return "Error fetching nearest hospital data: ${response.statusCode}. ${response.body}";
+    } catch (e) {
+      print(e);
+      return "Error fetching nearest hospital data: $e";
     }
-  } catch (e) {
-    print(e);
-    return "Error fetching nearest hospital data: $e";
   }
-}
 
   // Function to handle the button click and fetch nearest hospital
   Future<void> _getLocationAndFetchHospital(BuildContext context) async {
