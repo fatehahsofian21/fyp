@@ -7,6 +7,7 @@ import 'package:geolocator/geolocator.dart'; // Import Geolocator
 import 'home.dart'; // Import HomeScreen
 import 'hospitals.dart'; // Import HospitalsScreen
 import 'dart:ui' as ui;
+import 'dart:math' as Math;
 
 class ResultScreen extends StatelessWidget {
   final String base64Image;
@@ -57,17 +58,20 @@ class ResultScreen extends StatelessWidget {
     permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
-      if (permission != LocationPermission.whileInUse && permission != LocationPermission.always) {
+      if (permission != LocationPermission.whileInUse &&
+          permission != LocationPermission.always) {
         return Future.error('Location permission denied');
       }
     }
 
     // Get the current position (latitude and longitude)
-    return await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+    return await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high);
   }
 
-  // Function to fetch the nearest hospital from Gemini API with generation config
-  Future<String> _fetchNearestHospitalFromGemini(double latitude, double longitude) async {
+  // Function to fetch the nearest hospitals from the Gemini API
+  Future<List<String>> _fetchNearestHospitals(
+      double latitude, double longitude) async {
     try {
       const String apiUrl =
           'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=AIzaSyBagQghwNUOVdoRg7zwxXfaH-2MT61Pbvs';
@@ -86,13 +90,7 @@ class ResultScreen extends StatelessWidget {
             "parts": [
               {
                 "text":
-                    "Please provide a list of hospitals within a 10km radius of the following coordinates: latitude: $latitude, longitude: $longitude. List only 1 hospital. Do not include any extra text or symbols."
-              },
-              {
-                "inlineData": {
-                  "mimeType": "image/jpeg",
-                  "data": base64Image, // Send the base64 image here
-                }
+                    "Please provide a list of hospitals within a 10km radius of the following coordinates: latitude: $latitude, longitude: $longitude. List only 5 hospitals. Please do not include any extra text or information."
               }
             ]
           }
@@ -112,40 +110,81 @@ class ResultScreen extends StatelessWidget {
         final data = json.decode(response.body);
         if (data['candidates'] != null && data['candidates'].isNotEmpty) {
           final List<dynamic> parts = data['candidates'][0]['content']['parts'];
-          final List<String> hospitals = [];
+          final List<Map<String, dynamic>> hospitalWithDistance = [];
 
-          // Get only hospital names (ignore extra text)
+          // Add the hospitals and their distance to the list
           for (var part in parts) {
             if (part['text'] != null) {
               final hospitalsText = part['text'].toString().split('\n');
-              hospitals.addAll(hospitalsText);
-              if (hospitals.length >= 1) break; // Limit to 1 hospital
+              for (var hospital in hospitalsText) {
+                // Calculate distance to each hospital (dummy data for now)
+                double distance = _calculateDistance(
+                    latitude,
+                    longitude,
+                    5.2604573,
+                    103.1657039); // Replace with actual hospital coordinates
+                hospitalWithDistance.add({
+                  'hospital': hospital,
+                  'distance': distance,
+                });
+              }
             }
           }
 
-          return hospitals.join('\n'); // Return hospital names as a list
+          // Sort hospitals based on the calculated distance
+          hospitalWithDistance
+              .sort((a, b) => a['distance'].compareTo(b['distance']));
+
+          // Return only hospital names, sorted by distance
+          return hospitalWithDistance
+              .map((e) => e['hospital'] as String)
+              .toList();
         } else {
-          return "Error: No valid data returned from the API.";
+          return ["No hospitals found within the given radius."];
         }
       } else {
-        return "Error fetching nearest hospital data: ${response.statusCode}. ${response.body}";
+        return [
+          "Error fetching nearest hospital data: ${response.statusCode}. ${response.body}"
+        ];
       }
     } catch (e) {
       print(e);
-      return "Error fetching nearest hospital data: $e";
+      return ["Error fetching nearest hospital data: $e"];
     }
+  }
+
+  // Function to calculate the distance between two points (Haversine formula)
+  double _calculateDistance(
+      double lat1, double lon1, double lat2, double lon2) {
+    const double earthRadius = 6371; // Earth radius in kilometers
+    final double dLat = _degreesToRadians(lat2 - lat1);
+    final double dLon = _degreesToRadians(lon2 - lon1);
+
+    final double a = (Math.sin(dLat / 2) * Math.sin(dLat / 2)) +
+        Math.cos(_degreesToRadians(lat1)) *
+            Math.cos(_degreesToRadians(lat2)) *
+            (Math.sin(dLon / 2) * Math.sin(dLon / 2));
+
+    final double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return earthRadius * c; // Distance in kilometers
+  }
+
+  double _degreesToRadians(double degrees) {
+    return degrees * (Math.pi / 180);
   }
 
   // Function to handle the button click and fetch nearest hospital
   Future<void> _getLocationAndFetchHospital(BuildContext context) async {
     try {
       Position position = await _getCurrentLocation();
-      String nearestHospital = await _fetchNearestHospitalFromGemini(position.latitude, position.longitude);
+      List<String> nearestHospitals =
+          await _fetchNearestHospitals(position.latitude, position.longitude);
 
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => HospitalsScreen(nearestHospital: nearestHospital),
+          builder: (context) =>
+              HospitalsScreen(nearestHospitals: nearestHospitals),
         ),
       );
     } catch (e) {
@@ -181,15 +220,6 @@ class ResultScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Text(
-              "Skin Cancer Detected!",
-              style: TextStyle(
-                color: Colors.green,
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign: TextAlign.center,
-            ),
             const SizedBox(height: 20),
             Container(
               width: 220,
@@ -237,14 +267,14 @@ class ResultScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-
                 // Nearest Hospitals Button
                 SizedBox(
                   width: 160,
                   height: 40,
                   child: ElevatedButton(
                     onPressed: () {
-                      _getLocationAndFetchHospital(context);
+                      _getLocationAndFetchHospital(
+                          context); // Fetch and navigate to hospitals screen
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blueAccent,
@@ -257,7 +287,6 @@ class ResultScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-
                 SizedBox(
                   width: 160,
                   height: 40,
