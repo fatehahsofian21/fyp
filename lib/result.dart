@@ -73,40 +73,74 @@ class ResultScreen extends StatelessWidget {
 
   double _degToRad(double deg) => deg * (math.pi / 180);
 
-  Future<List<String>> _fetchNearbyHospitals(double lat, double lon) async {
+  Future<List<Map<String, dynamic>>> _fetchNearbyHospitals(double lat, double lon) async {
     final radiusInMeters = 20000;
-    final String url =
-        'https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=$lat,$lon&radius=$radiusInMeters&type=hospital&key=$googleApiKey';
+    final String nearbyUrl =
+        'https://maps.googleapis.com/maps/api/place/nearbysearch/json'
+        '?location=$lat,$lon'
+        '&radius=$radiusInMeters'
+        '&type=hospital'
+        '&key=$googleApiKey';
 
-    final response = await http.get(Uri.parse(url));
+    final response = await http.get(Uri.parse(nearbyUrl));
     if (response.statusCode != 200) {
-      return ["Error fetching hospitals."];
+      return [{"name": "Error fetching hospitals."}];
     }
 
     final data = json.decode(response.body);
     if (data['results'] == null || data['results'].isEmpty) {
-      return ["No hospitals found within 20km."];
+      return [{"name": "No hospitals found within 20km."}];
     }
 
     List<Map<String, dynamic>> results = [];
 
     for (var hospital in data['results']) {
-      final name = hospital['name'];
+      final name = hospital['name'].toString().toLowerCase();
       final lat2 = hospital['geometry']['location']['lat'];
       final lon2 = hospital['geometry']['location']['lng'];
       final distance = _calculateDistance(lat, lon, lat2, lon2);
 
-      if (distance <= 20) {
+      bool isAcceptable = (name.contains('hospital') ||
+          name.contains('clinic') ||
+          name.contains('klinik') ||
+          name.contains('medical center') ||
+          name.contains('pharmacy')) &&
+          !(name.contains('spa') ||
+            name.contains('esthetic') ||
+            name.contains('facial') ||
+            name.contains('beauty') ||
+            name.contains('salon'));
+
+      if (distance <= 20 && isAcceptable) {
+        // ✅ Fetch Phone Number using Place ID
+        String placeId = hospital['place_id'];
+        String phoneNumber = await _fetchPhoneNumber(placeId);
+
         results.add({
-          'name': name,
+          'name': hospital['name'],
           'distance': distance,
+          'phone': phoneNumber,
         });
       }
     }
 
     results.sort((a, b) => a['distance'].compareTo(b['distance']));
 
-    return results.take(3).map((h) => "${h['name']}: ${h['distance'].toStringAsFixed(2)} km").toList();
+    return results.take(3).toList();
+  }
+
+  Future<String> _fetchPhoneNumber(String placeId) async {
+    final String detailsUrl =
+        'https://maps.googleapis.com/maps/api/place/details/json?place_id=$placeId&fields=name,formatted_phone_number&key=$googleApiKey';
+
+    final response = await http.get(Uri.parse(detailsUrl));
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['result'] != null && data['result']['formatted_phone_number'] != null) {
+        return data['result']['formatted_phone_number'];
+      }
+    }
+    return "Phone number not available.";
   }
 
   Future<void> _getLocationAndFetchHospital(BuildContext context) async {
