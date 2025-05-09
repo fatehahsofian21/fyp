@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'dart:convert';
+import 'package:http/http.dart' as http; // Add this import
 import 'result.dart'; // Import ResultScreen
 import 'history.dart'; // Import HistoryScreen
 import 'profile.dart'; // Import ProfileScreen
@@ -40,7 +41,8 @@ class _HomeScreenState extends State<HomeScreen> {
             .doc(user.uid)
             .get();
 
-        String fullName = userDoc["name"] ?? "User"; // Get full name or default to "User"
+        String fullName =
+            userDoc["name"] ?? "User"; // Get full name or default to "User"
         String firstName = fullName.split(" ")[0]; // Extract first name
 
         setState(() {
@@ -108,28 +110,58 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // Start scan process
-  void _startScan() {
+  void _startScan() async {
     if (_selectedImage != null && _base64Image != null) {
-      final detectionResults = {
-        "Basal Cell Carcinoma": 0.95,
-        "Squamous Cell Carcinoma": 0.05,
-      };
+      try {
+        // Send the image to Flask backend for processing
+        final url = Uri.parse(
+            'http://10.62.53.149:5000/process-image'); // Flask endpoint
+        final response = await http.post(
+          url,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'image': _base64Image}),
+        );
 
-      // Navigate to ResultScreen after scanning
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => ResultScreen(
-            base64Image: _base64Image!,
-            detectionResults: detectionResults,
-            onRetry: _resetImage,
-          ),
-        ),
-      ).then((_) {
-        setState(() {
-          _hasScannedBefore = true;
-        });
-      });
+        debugPrint('response: ${response.body}'); // Debugging line
+
+        if (response.statusCode == 200) {
+          // Parse the response from Flask
+          final Map<String, dynamic> jsonResponse = jsonDecode(response.body);
+          final List<Map<String, dynamic>> detections =
+              List<Map<String, dynamic>>.from(jsonResponse['detections']);
+
+          // Navigate to ResultScreen after scanning
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ResultScreen(
+                base64Image: _base64Image!,
+                detectionResults:
+                    detections, // Pass the extracted detections list
+                onRetry: _resetImage,
+              ),
+            ),
+          ).then((_) {
+            setState(() {
+              _hasScannedBefore = true;
+            });
+          });
+        } else {
+          // Handle error response
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("Error processing image!")),
+            );
+          }
+          debugPrint('Error: ${response.statusCode}');
+        }
+      } catch (e) {
+        // Handle network or other errors
+        print("Error: $e");
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Failed to connect to the server!")),
+        );
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Please select an image first!")),
@@ -156,7 +188,8 @@ class _HomeScreenState extends State<HomeScreen> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => const ProfileScreen(), // Navigate to ProfileScreen
+          builder: (context) =>
+              const ProfileScreen(), // Navigate to ProfileScreen
         ),
       );
     }
@@ -199,7 +232,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         ? const CircularProgressIndicator(color: Colors.white)
                         : Text(
                             "Welcome back, $_userName!", // Display first name
-                            style: const TextStyle(color: Colors.white, fontSize: 18),
+                            style: const TextStyle(
+                                color: Colors.white, fontSize: 18),
                           ),
                   ],
                 ),
@@ -207,11 +241,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.diamond_outlined, color: Colors.white, size: 22),
+                      icon: const Icon(Icons.diamond_outlined,
+                          color: Colors.white, size: 22),
                       onPressed: () {},
                     ),
                     IconButton(
-                      icon: const Icon(Icons.notifications_outlined, color: Colors.white, size: 24),
+                      icon: const Icon(Icons.notifications_outlined,
+                          color: Colors.white, size: 24),
                       onPressed: () {},
                     ),
                   ],
@@ -235,7 +271,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: Colors.white.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(20),
                   image: _selectedImage != null
-                      ? DecorationImage(image: FileImage(_selectedImage!), fit: BoxFit.cover)
+                      ? DecorationImage(
+                          image: FileImage(_selectedImage!), fit: BoxFit.cover)
                       : null,
                 ),
                 child: _selectedImage == null
@@ -244,7 +281,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         children: [
                           Icon(Icons.camera_alt, size: 40, color: Colors.white),
                           SizedBox(height: 10),
-                          Text("Click to upload photo", style: TextStyle(color: Colors.white, fontSize: 14)),
+                          Text("Click to upload photo",
+                              style:
+                                  TextStyle(color: Colors.white, fontSize: 14)),
                         ],
                       )
                     : null,
@@ -258,11 +297,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 onPressed: _startScan, // Trigger the start scan action
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFD6C3B8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
                 ),
                 child: Text(
                   _hasScannedBefore ? "RESCAN" : "START SCAN",
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black),
+                  style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black),
                 ),
               ),
             ),
@@ -278,7 +321,8 @@ class _HomeScreenState extends State<HomeScreen> {
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
           BottomNavigationBarItem(icon: Icon(Icons.history), label: "History"),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"), // Added Profile
+          BottomNavigationBarItem(
+              icon: Icon(Icons.person), label: "Profile"), // Added Profile
         ],
       ),
     );

@@ -142,7 +142,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                       double value = entry.value ?? 0.0; // Ensure value is not null
                                       return Text("${entry.key}: ${(value * 100).toStringAsFixed(2)}%");
                                     })
-                                    .toList(),
+                                    ,
                               ],
                             ),
                             actions: [

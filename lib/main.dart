@@ -1,7 +1,9 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // ✅ Import Firebase Auth
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart'; // ✅ Import Geolocator
 import 'login.dart'; // Import your login screen
+import 'home.dart'; // Import HomeScreen instead of HistoryScreen
 import 'history.dart'; // Import HistoryScreen
 
 void main() async {
@@ -12,7 +14,9 @@ void main() async {
     await _initGeolocator(); // ✅ Initialize Geolocator Permissions
     runApp(const MyApp());
   } catch (e) {
-    runApp(ErrorApp(errorMessage: e.toString())); // Show error if Firebase or Geolocator fails
+    runApp(ErrorApp(
+        errorMessage:
+            e.toString())); // Show error if Firebase or Geolocator fails
   }
 }
 
@@ -53,12 +57,28 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: const LoginScreen(), // Start with Login Screen
+      home: StreamBuilder<User?>(
+        stream: FirebaseAuth.instance.authStateChanges(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.active) {
+            if (snapshot.hasData) {
+              // If user is logged in, navigate to home screen or other main screen
+              return const HomeScreen(); // Home screen is now the first screen
+            } else {
+              // If user is not logged in, show login screen
+              return const LoginScreen();
+            }
+          }
 
+          // Show loading indicator while checking login state
+          return const Center(child: CircularProgressIndicator());
+        },
+      ),
       // Define the routes, including passing data dynamically
       routes: {
         '/history': (context) => HistoryScreen(
-              detectionResults: ModalRoute.of(context)!.settings.arguments as Map<String, double>,
+              detectionResults: ModalRoute.of(context)!.settings.arguments
+                  as Map<String, double>,
             ), // Navigate to HistoryScreen with detectionResults
       },
     );
@@ -68,7 +88,7 @@ class MyApp extends StatelessWidget {
 // ✅ Error Screen if Firebase or Geolocator Fails
 class ErrorApp extends StatelessWidget {
   final String errorMessage;
-  const ErrorApp({Key? key, required this.errorMessage}) : super(key: key);
+  const ErrorApp({super.key, required this.errorMessage});
 
   @override
   Widget build(BuildContext context) {

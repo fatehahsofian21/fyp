@@ -4,7 +4,7 @@ import 'premium.dart'; // Import premium.dart to navigate
 class HospitalsScreen extends StatelessWidget {
   final List<Map<String, dynamic>> nearestHospitals;
 
-  const HospitalsScreen({Key? key, required this.nearestHospitals}) : super(key: key);
+  const HospitalsScreen({super.key, required this.nearestHospitals});
 
   @override
   Widget build(BuildContext context) {

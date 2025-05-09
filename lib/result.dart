@@ -11,15 +11,15 @@ import 'hospitals.dart';
 
 class ResultScreen extends StatelessWidget {
   final String base64Image;
-  final Map<String, double> detectionResults;
+  final List<Map<String, dynamic>> detectionResults; // Updated type
   final VoidCallback onRetry;
 
-  ResultScreen({
-    Key? key,
+  const ResultScreen({
+    super.key,
     required this.base64Image,
-    required this.detectionResults,
+    required this.detectionResults, // Updated type
     required this.onRetry,
-  }) : super(key: key);
+  });
 
   final String googleApiKey = 'AIzaSyDvOiL5Yc2riuilz2KtovXeaqSzLWGk7CE';
 
@@ -50,22 +50,27 @@ class ResultScreen extends StatelessWidget {
     LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
-      if (permission != LocationPermission.whileInUse && permission != LocationPermission.always) {
+      if (permission != LocationPermission.whileInUse &&
+          permission != LocationPermission.always) {
         return Future.error('Location permission denied');
       }
     }
 
-    return await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+    return await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high);
   }
 
-  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+  double _calculateDistance(
+      double lat1, double lon1, double lat2, double lon2) {
     const double R = 6371;
     final dLat = _degToRad(lat2 - lat1);
     final dLon = _degToRad(lon2 - lon1);
 
     final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
-        math.cos(_degToRad(lat1)) * math.cos(_degToRad(lat2)) *
-            math.sin(dLon / 2) * math.sin(dLon / 2);
+        math.cos(_degToRad(lat1)) *
+            math.cos(_degToRad(lat2)) *
+            math.sin(dLon / 2) *
+            math.sin(dLon / 2);
 
     final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
     return R * c;
@@ -73,7 +78,8 @@ class ResultScreen extends StatelessWidget {
 
   double _degToRad(double deg) => deg * (math.pi / 180);
 
-  Future<List<Map<String, dynamic>>> _fetchNearbyHospitals(double lat, double lon) async {
+  Future<List<Map<String, dynamic>>> _fetchNearbyHospitals(
+      double lat, double lon) async {
     final radiusInMeters = 20000;
     final String nearbyUrl =
         'https://maps.googleapis.com/maps/api/place/nearbysearch/json'
@@ -84,12 +90,16 @@ class ResultScreen extends StatelessWidget {
 
     final response = await http.get(Uri.parse(nearbyUrl));
     if (response.statusCode != 200) {
-      return [{"name": "Error fetching hospitals."}];
+      return [
+        {"name": "Error fetching hospitals."}
+      ];
     }
 
     final data = json.decode(response.body);
     if (data['results'] == null || data['results'].isEmpty) {
-      return [{"name": "No hospitals found within 20km."}];
+      return [
+        {"name": "No hospitals found within 20km."}
+      ];
     }
 
     List<Map<String, dynamic>> results = [];
@@ -101,25 +111,21 @@ class ResultScreen extends StatelessWidget {
       final distance = _calculateDistance(lat, lon, lat2, lon2);
 
       bool isAcceptable = (name.contains('hospital') ||
-          name.contains('clinic') ||
-          name.contains('klinik') ||
-          name.contains('medical center') ||
-          name.contains('pharmacy')) &&
+              name.contains('clinic') ||
+              name.contains('klinik') ||
+              name.contains('medical center') ||
+              name.contains('pharmacy')) &&
           !(name.contains('spa') ||
-            name.contains('esthetic') ||
-            name.contains('facial') ||
-            name.contains('beauty') ||
-            name.contains('salon'));
+              name.contains('esthetic') ||
+              name.contains('facial') ||
+              name.contains('beauty') ||
+              name.contains('salon'));
 
       if (distance <= 20 && isAcceptable) {
-        // ✅ Fetch Phone Number using Place ID
-        String placeId = hospital['place_id'];
-        String phoneNumber = await _fetchPhoneNumber(placeId);
-
         results.add({
           'name': hospital['name'],
           'distance': distance,
-          'phone': phoneNumber,
+          'place_id': hospital['place_id'],
         });
       }
     }
@@ -136,7 +142,8 @@ class ResultScreen extends StatelessWidget {
     final response = await http.get(Uri.parse(detailsUrl));
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
-      if (data['result'] != null && data['result']['formatted_phone_number'] != null) {
+      if (data['result'] != null &&
+          data['result']['formatted_phone_number'] != null) {
         return data['result']['formatted_phone_number'];
       }
     }
@@ -146,7 +153,24 @@ class ResultScreen extends StatelessWidget {
   Future<void> _getLocationAndFetchHospital(BuildContext context) async {
     try {
       final pos = await _getCurrentLocation();
-      final hospitals = await _fetchNearbyHospitals(pos.latitude, pos.longitude);
+      final hospitals =
+          await _fetchNearbyHospitals(pos.latitude, pos.longitude);
+
+      // Loading screen while fetching phone numbers asynchronously
+      showDialog(
+        context: context,
+        builder: (_) => const Center(child: CircularProgressIndicator()),
+      );
+
+      // Fetch phone numbers for each hospital asynchronously
+      for (var hospital in hospitals) {
+        final phoneNumber = await _fetchPhoneNumber(hospital['place_id']);
+        hospital['phone'] = phoneNumber;
+      }
+
+      Navigator.pop(context); // Remove loading dialog
+
+      // Navigate to hospitals screen with updated hospital data
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -184,15 +208,35 @@ class ResultScreen extends StatelessWidget {
           children: [
             const Text(
               "Skin Cancer Detected!",
-              style: TextStyle(color: Colors.red, fontSize: 22, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                  color: Colors.red, fontSize: 22, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 20),
             Image.memory(base64Decode(base64Image), width: 200, height: 200),
             const SizedBox(height: 20),
-            ...detectionResults.entries.map((entry) => Text(
-              "${entry.key}: ${(entry.value * 100).toStringAsFixed(2)}%",
-              style: const TextStyle(color: Colors.white),
-            )),
+            detectionResults.isNotEmpty
+                ? Column(
+                    children: detectionResults.map((result) {
+                      final boundingBox = result['bounding_box'];
+                      final classId = result['class_id'];
+                      final confidence = result['confidence'];
+
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8.0),
+                        child: Text(
+                          "Class ID: $classId\n"
+                          "Confidence: ${(confidence * 100).toStringAsFixed(2)}%\n"
+                          "Bounding Box: [${boundingBox[0]}, ${boundingBox[1]}, ${boundingBox[2]}, ${boundingBox[3]}]",
+                          style: const TextStyle(color: Colors.white),
+                          textAlign: TextAlign.center,
+                        ),
+                      );
+                    }).toList(),
+                  )
+                : const Text(
+                    "No detections found.",
+                    style: TextStyle(color: Colors.white),
+                  ),
             const SizedBox(height: 30),
             SizedBox(
               width: 160,
@@ -208,7 +252,8 @@ class ResultScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                child: const Text("Retry", style: TextStyle(fontSize: 14, color: Colors.white)),
+                child: const Text("Retry",
+                    style: TextStyle(fontSize: 14, color: Colors.white)),
               ),
             ),
             const SizedBox(height: 12),
@@ -223,7 +268,8 @@ class ResultScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                child: const Text("Nearest Hospitals", style: TextStyle(fontSize: 13, color: Colors.white)),
+                child: const Text("Nearest Hospitals",
+                    style: TextStyle(fontSize: 13, color: Colors.white)),
               ),
             ),
             const SizedBox(height: 12),
@@ -234,8 +280,8 @@ class ResultScreen extends StatelessWidget {
                 onPressed: () {
                   _saveToFirebase({
                     'image': base64Image,
-                    'Basal Cell Carcinoma': detectionResults['Basal Cell Carcinoma'],
-                    'Squamous Cell Carcinoma': detectionResults['Squamous Cell Carcinoma'],
+                    'detections':
+                        detectionResults, // Save the entire list of detections
                   });
                   Navigator.pushAndRemoveUntil(
                     context,
@@ -249,7 +295,8 @@ class ResultScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                child: const Text("Done", style: TextStyle(fontSize: 14, color: Colors.white)),
+                child: const Text("Done",
+                    style: TextStyle(fontSize: 14, color: Colors.white)),
               ),
             ),
           ],
