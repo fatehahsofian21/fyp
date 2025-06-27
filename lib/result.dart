@@ -27,7 +27,11 @@ class ResultScreen extends StatelessWidget {
       User? user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         String scanId = DateTime.now().millisecondsSinceEpoch.toString();
-        await FirebaseFirestore.instance.collection('scan_results').add({
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('scan_results')
+            .add({
           'userId': user.uid,
           'scanId': scanId,
           'detectionResults': results,

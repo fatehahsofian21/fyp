@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class HistoryScreen extends StatelessWidget {
   const HistoryScreen({super.key, this.detectionResults = const {}});
@@ -99,19 +100,30 @@ class _HistoryList extends StatelessWidget {
   const _HistoryList({required this.filter});
 
   Future<void> _deleteDoc(BuildContext context, String docId) async {
-    await FirebaseFirestore.instance
-        .collection('scan_results')
-        .doc(docId)
-        .delete();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Deleted successfully.")),
-    );
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('scan_results')
+          .doc(docId)
+          .delete();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Deleted successfully.")),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return const Center(child: Text("Not logged in."));
+    }
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
           .collection('scan_results')
           .orderBy('createdAt', descending: true)
           .snapshots(),
