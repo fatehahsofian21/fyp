@@ -11,7 +11,7 @@ from io import BytesIO
 app = Flask(__name__)
 
 # Load the YOLOv8 model
-model = YOLO(r"C:\flutterProject\fyp\best.pt")
+model = YOLO(r"C:\Users\USER\OneDrive\Documents\FYP FATEHAH\DATASET\MELVASC\split_dataset70\modelAdam8m\epoch50.pt")
 
 # API endpoint for processing base64-encoded image
 @app.route('/process-image', methods=['POST'])
@@ -25,8 +25,12 @@ def process_image():
         image_data = base64.b64decode(base64_image)
         image = Image.open(BytesIO(image_data)).convert("RGB")  # Ensure the image is in RGB format
 
+        # Save the received image
+        image.save("received_image.jpg")
+
         # Convert the PIL image to a NumPy array (YOLO expects NumPy arrays)
         image_np = np.array(image)
+        print("Image shape:", image_np.shape)
 
         # Perform inference using the YOLOv8 model
         results = model.predict(image_np)

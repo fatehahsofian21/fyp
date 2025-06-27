@@ -5,19 +5,18 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
 import 'dart:math' as math;
-
 import 'home.dart';
 import 'hospitals.dart';
 
 class ResultScreen extends StatelessWidget {
   final String base64Image;
-  final List<Map<String, dynamic>> detectionResults; // Updated type
+  final List<Map<String, dynamic>> detectionResults;
   final VoidCallback onRetry;
 
   const ResultScreen({
     super.key,
     required this.base64Image,
-    required this.detectionResults, // Updated type
+    required this.detectionResults,
     required this.onRetry,
   });
 
@@ -184,119 +183,320 @@ class ResultScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF2F4858),
-      appBar: AppBar(
-        title: const Text("Scan Result", style: TextStyle(color: Colors.white)),
-        backgroundColor: const Color(0xFF2F4858),
-        centerTitle: true,
-        iconTheme: const IconThemeData(color: Colors.white),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(builder: (_) => const HomeScreen()),
-              (_) => false,
-            );
-          },
-        ),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text(
-              "Skin Cancer Detected!",
-              style: TextStyle(
-                  color: Colors.red, fontSize: 22, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 20),
-            Image.memory(base64Decode(base64Image), width: 200, height: 200),
-            const SizedBox(height: 20),
-            detectionResults.isNotEmpty
-                ? Column(
-                    children: detectionResults.map((result) {
-                      final boundingBox = result['bounding_box'];
-                      final classId = result['class_id'];
-                      final confidence = result['confidence'];
+    // Color palette
+    const Color backgroundColor = Color(0xFFE3F0FF); // baby blue
+    const Color mainTextColor = Color(0xFF223A5E); // navy/dark blue
+    const Color cardBlue = Color(0xFFD2E6FF); // light blue for bottom card
+    const Color buttonBlue = Color(0xFFB3D1F6); // soft blue
+    const Color buttonGreen = Color(0xFF8DC6A7); // soft green
+    const Color buttonGrey = Color(0xFFB0B8C1); // soft grey
 
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8.0),
-                        child: Text(
-                          "Class ID: $classId\n"
-                          "Confidence: ${(confidence * 100).toStringAsFixed(2)}%\n"
-                          "Bounding Box: [${boundingBox[0]}, ${boundingBox[1]}, ${boundingBox[2]}, ${boundingBox[3]}]",
-                          style: const TextStyle(color: Colors.white),
-                          textAlign: TextAlign.center,
-                        ),
+    final bool hasDetection = detectionResults.isNotEmpty;
+    final imageBytes = base64Decode(base64Image);
+
+    // Prepare cancer type and confidence
+    List<Widget> cancerWidgets = [];
+    if (hasDetection) {
+      final Map<int, Map<String, dynamic>> bestByType = {};
+      for (var det in detectionResults) {
+        final int classId = det['class_id'];
+        if (!bestByType.containsKey(classId) ||
+            (det['confidence'] as double) >
+                (bestByType[classId]!['confidence'] as double)) {
+          bestByType[classId] = det;
+        }
+      }
+      final sorted = bestByType.values.toList()
+        ..sort((a, b) =>
+            (b['confidence'] as double).compareTo(a['confidence'] as double));
+      for (var det in sorted) {
+        final classId = det['class_id'];
+        final confidence = det['confidence'];
+        String cancerType;
+        if (classId == 0) {
+          cancerType = "Melanoma";
+        } else if (classId == 1) {
+          cancerType = "Vascular Lesion";
+        } else {
+          cancerType = "Unknown";
+        }
+        cancerWidgets.add(
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2.0),
+            child: Text(
+              "$cancerType\nConfidence: ${(confidence * 100).toStringAsFixed(2)}%",
+              style: const TextStyle(
+                color: mainTextColor,
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        );
+      }
+    }
+
+    return Scaffold(
+      backgroundColor: backgroundColor,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Header with back button and cancer analysis label
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back, color: mainTextColor),
+                    onPressed: () {
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(builder: (_) => const HomeScreen()),
+                        (_) => false,
                       );
-                    }).toList(),
-                  )
-                : const Text(
-                    "No detections found.",
-                    style: TextStyle(color: Colors.white),
+                    },
                   ),
-            const SizedBox(height: 30),
-            SizedBox(
-              width: 160,
-              height: 40,
-              child: ElevatedButton(
-                onPressed: () {
-                  onRetry();
-                  Navigator.pop(context);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.grey[600],
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+                  const Spacer(),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE3F0FF), // baby blue
+                      borderRadius: BorderRadius.circular(22),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.blue.withOpacity(
+                              0.10), // subtle blue shadow for "timbul" effect
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Text(
+                      "Cancer analysis",
+                      style: TextStyle(
+                        color: mainTextColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
                   ),
-                ),
-                child: const Text("Retry",
-                    style: TextStyle(fontSize: 14, color: Colors.white)),
+                  const Spacer(),
+                  const SizedBox(width: 40), // To balance the row
+                ],
               ),
             ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: 160,
-              height: 40,
-              child: ElevatedButton(
-                onPressed: () => _getLocationAndFetchHospital(context),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blueAccent,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+            // Large image, no blue background, fills the space
+            Expanded(
+              child: Center(
+                child: AspectRatio(
+                  aspectRatio: 1, // Ensures a square area
+                  child: FractionallySizedBox(
+                    widthFactor:
+                        1.0, // Make the image area as big as possible (100% of available width)
+                    heightFactor:
+                        1.0, // Make the image area as big as possible (100% of available height)
+                    alignment: Alignment.center,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final imgW = constraints.maxWidth;
+                        final imgH = constraints.maxHeight;
+                        return Stack(
+                          children: [
+                            Image.memory(
+                              imageBytes,
+                              width: imgW,
+                              height: imgH,
+                              fit: BoxFit.cover,
+                            ),
+                            ...detectionResults.map((det) {
+                              List? boundingBox = det['bounding_box'];
+                              if (boundingBox == null ||
+                                  boundingBox.length != 4) {
+                                return const SizedBox.shrink();
+                              }
+                              double left = boundingBox[0].toDouble();
+                              double top = boundingBox[1].toDouble();
+                              double width = boundingBox[2].toDouble();
+                              double height = boundingBox[3].toDouble();
+
+                              double origW = 640; // Your real image width
+                              double origH = 640; // Your real image height
+
+                              double scaleX = imgW / origW;
+                              double scaleY = imgH / origH;
+
+                              return Positioned(
+                                left: left * scaleX,
+                                top: top * scaleY,
+                                width: width * scaleX,
+                                height: height * scaleY,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    border: Border.all(
+                                      color: Colors.red,
+                                      width: 3,
+                                    ),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ],
+                        );
+                      },
+                    ),
                   ),
                 ),
-                child: const Text("Nearest Hospitals",
-                    style: TextStyle(fontSize: 13, color: Colors.white)),
               ),
             ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: 160,
-              height: 40,
-              child: ElevatedButton(
-                onPressed: () {
-                  _saveToFirebase({
-                    'image': base64Image,
-                    'detections':
-                        detectionResults, // Save the entire list of detections
-                  });
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(builder: (_) => const HomeScreen()),
-                    (_) => false,
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+            // Card with result info at the bottom, blue background
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+              decoration: const BoxDecoration(
+                color: cardBlue,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Detection status
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 18, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: hasDetection
+                          ? Colors.red.withOpacity(0.13)
+                          : Colors.green.withOpacity(0.13),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      hasDetection ? "Skin cancer detected" : "No detection",
+                      style: TextStyle(
+                        color: hasDetection ? Colors.red : Colors.green,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
                   ),
-                ),
-                child: const Text("Done",
-                    style: TextStyle(fontSize: 14, color: Colors.white)),
+                  const SizedBox(height: 18),
+                  // Cancer type and confidence
+                  if (hasDetection && cancerWidgets.isNotEmpty)
+                    Builder(
+                      builder: (_) {
+                        final text =
+                            (cancerWidgets.first as Padding).child as Text;
+                        final lines = text.data?.split('\n');
+                        final cancerType =
+                            lines != null && lines.isNotEmpty ? lines[0] : '';
+                        final confidence =
+                            lines != null && lines.length > 1 ? lines[1] : '';
+                        return Column(
+                          children: [
+                            Text(
+                              "Cancer type: $cancerType",
+                              style: const TextStyle(
+                                color: mainTextColor,
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            if (confidence.isNotEmpty)
+                              Text(
+                                confidence,
+                                style: const TextStyle(
+                                  color: mainTextColor,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                          ],
+                        );
+                      },
+                    ),
+                  const SizedBox(height: 18),
+                  // Buttons
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            onRetry();
+                            Navigator.pop(context);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: buttonGrey,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          child: const Text(
+                            "Retry",
+                            style:
+                                TextStyle(fontSize: 15, color: mainTextColor),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () =>
+                              _getLocationAndFetchHospital(context),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: buttonBlue,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          child: const Text(
+                            "Nearest Hospitals",
+                            style:
+                                TextStyle(fontSize: 14, color: mainTextColor),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        _saveToFirebase({
+                          'image': base64Image,
+                          'detections': detectionResults,
+                        });
+                        Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(builder: (_) => const HomeScreen()),
+                          (_) => false,
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: buttonGreen,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      child: const Text(
+                        "Done",
+                        style: TextStyle(fontSize: 15, color: mainTextColor),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],

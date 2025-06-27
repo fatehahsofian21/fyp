@@ -1,182 +1,436 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:convert';
+import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
-class HistoryScreen extends StatefulWidget {
-  final Map<String, double> detectionResults;
+class HistoryScreen extends StatelessWidget {
+  const HistoryScreen({super.key, this.detectionResults = const {}});
+  final Map<String, dynamic> detectionResults;
 
-  const HistoryScreen({super.key, required this.detectionResults});
-
-  @override
-  _HistoryScreenState createState() => _HistoryScreenState();
-}
-
-class _HistoryScreenState extends State<HistoryScreen> {
-  List<Map<String, dynamic>> _history = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _loadHistory();
-  }
-
-  // Load previously saved history from SharedPreferences
-  _loadHistory() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? historyData = prefs.getString('history');
-    if (historyData != null) {
-      List decodedData = json.decode(historyData);
-      setState(() {
-        _history = decodedData.map((item) => Map<String, dynamic>.from(item)).toList();
-      });
+  Future<void> _resetAll(BuildContext context) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Reset All History"),
+        content: const Text(
+            "Are you sure you want to delete all history? This cannot be undone."),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child:
+                const Text("Delete All", style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      final batch = FirebaseFirestore.instance.batch();
+      final snapshot =
+          await FirebaseFirestore.instance.collection('scan_results').get();
+      for (var doc in snapshot.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("All history deleted.")),
+      );
     }
   }
 
-  // Save current result to history
-  _saveToHistory(List<Map<String, dynamic>> history) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    String historyData = json.encode(history);
-    prefs.setString('history', historyData);
-  }
-
-  // Add current result to the history list
-  _addToHistory(Map<String, dynamic> result) {
-    setState(() {
-      _history.add(result);
-      // Save the updated history list to SharedPreferences
-      _saveToHistory(_history);
-    });
-  }
-
-  // Show confirmation dialog before deleting a history item
-  _confirmDelete(int index) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Delete this scan result?'),
-          content: const Text('Are you sure you want to delete this scan result?'),
+  @override
+  Widget build(BuildContext context) {
+    return DefaultTabController(
+      length: 4,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text("Scan History"),
+          backgroundColor: const Color(0xFFE3F0FF),
+          foregroundColor: const Color(0xFF223A5E),
+          elevation: 0,
           actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop(); // Close the dialog
-              },
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                setState(() {
-                  _history.removeAt(index);
-                  // Save the updated history list after deletion
-                  _saveToHistory(_history);
-                });
-                Navigator.of(context).pop(); // Close the dialog after deletion
-              },
-              child: const Text('Delete'),
+            IconButton(
+              icon: const Icon(Icons.delete_forever, color: Color(0xFF223A5E)),
+              tooltip: "Reset All",
+              onPressed: () => _resetAll(context),
             ),
           ],
-        );
-      },
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(60),
+            child: Container(
+              // No color here, let it blend with wallpaper
+              child: const TabBar(
+                isScrollable: true,
+                indicatorColor: Color(0xFF223A5E),
+                labelColor: Color(0xFF223A5E),
+                unselectedLabelColor: Color(0xFF4C6D83),
+                tabs: [
+                  Tab(text: "All"),
+                  Tab(text: "Melanoma"),
+                  Tab(text: "Vascular"),
+                  Tab(text: "No Detection"),
+                ],
+              ),
+            ),
+          ),
+        ),
+        backgroundColor: const Color(0xFFE3F0FF),
+        body: const TabBarView(
+          children: [
+            _HistoryList(filter: 'all'),
+            _HistoryList(filter: 'melanoma'),
+            _HistoryList(filter: 'vascular'),
+            _HistoryList(filter: 'no_detection'),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HistoryList extends StatelessWidget {
+  final String filter;
+  const _HistoryList({required this.filter});
+
+  Future<void> _deleteDoc(BuildContext context, String docId) async {
+    await FirebaseFirestore.instance
+        .collection('scan_results')
+        .doc(docId)
+        .delete();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Deleted successfully.")),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    // Add the current scan result when the screen is built, but only once
-    if (_history.isEmpty) {
-      _addToHistory({
-        'image': widget.detectionResults['image'],  // Assuming 'image' is part of detection results
-        'Basal Cell Carcinoma': widget.detectionResults['Basal Cell Carcinoma'],
-        'Squamous Cell Carcinoma': widget.detectionResults['Squamous Cell Carcinoma'],
-      });
-    }
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('scan_results')
+          .orderBy('createdAt', descending: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return const Center(child: Text("No results saved yet."));
+        }
+        final docs = snapshot.data!.docs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          if (filter == 'all') return true;
+          if (data['detectionResults'] != null &&
+              data['detectionResults']['detections'] != null &&
+              data['detectionResults']['detections'] is List &&
+              (data['detectionResults']['detections'] as List).isNotEmpty) {
+            final det = data['detectionResults']['detections'][0];
+            final classId = det['class_id'];
+            if (filter == 'melanoma' && classId == 0) return true;
+            if (filter == 'vascular' && classId == 1) return true;
+          }
+          return false;
+        }).toList();
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Scan History"),
-        backgroundColor: const Color(0xFF2F4858), // Matching color to the app theme
-      ),
-      backgroundColor: const Color(0xFF2F4858), // Set background color to match header
-      body: _history.isEmpty
-          ? const Center(child: Text("No results saved yet."))
-          : ListView.builder(
-              itemCount: _history.length,
-              itemBuilder: (context, index) {
-                Map<String, dynamic> scanResult = _history[index];
-                return Dismissible(
-                  key: Key(index.toString()),
-                  direction: DismissDirection.endToStart,
-                  onDismissed: (direction) {
-                    _confirmDelete(index); // Show the confirmation dialog before deletion
-                  },
-                  background: Container(
-                    color: Colors.red,
-                    alignment: Alignment.centerRight,
-                    padding: const EdgeInsets.only(right: 20),
-                    child: const Icon(Icons.delete, color: Colors.white),
-                  ),
-                  child: InkWell(
-                    onTap: () {
-                      // Show scan details when the card is tapped
-                      showDialog(
-                        context: context,
-                        barrierDismissible: true,  // Allow dismissing by tapping outside
-                        builder: (context) {
-                          return AlertDialog(
-                            title: const Text("Scan Result"),
-                            content: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                // Ensure image is not null and base64 decoding is valid
-                                if (scanResult['image'] != null && scanResult['image'].isNotEmpty)
-                                  Image.memory(
-                                    base64Decode(scanResult['image']),
-                                    width: 100,
-                                    height: 100,
-                                  ),
-                                const SizedBox(height: 10),
-                                // Display the result entries (e.g., Basal Cell Carcinoma)
-                                ...scanResult.entries
-                                    .map((entry) {
-                                      double value = entry.value ?? 0.0; // Ensure value is not null
-                                      return Text("${entry.key}: ${(value * 100).toStringAsFixed(2)}%");
-                                    })
-                                    ,
-                              ],
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () {
-                                  Navigator.of(context).pop();  // Close the dialog
-                                },
-                                child: const Text('Close'),
-                              ),
-                            ],
-                          );
-                        },
-                      );
-                    },
-                    child: Card(
-                      color: const Color(0xFFD6C3B8), // Cream color card
-                      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 15),
-                      child: ListTile(
-                        title: Text("Scan ${index + 1}"),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: scanResult.entries
-                              .map((entry) {
-                                double value = entry.value ?? 0.0; // Ensure value is not null
-                                return Text("${entry.key}: ${(value * 100).toStringAsFixed(2)}%");
-                              })
-                              .toList(),
-                        ),
+        if (docs.isEmpty) {
+          return const Center(child: Text("No results for this filter."));
+        }
+
+        return ListView.builder(
+          itemCount: docs.length,
+          itemBuilder: (context, index) {
+            final doc = docs[index];
+            final data = doc.data() as Map<String, dynamic>;
+            final Timestamp ts = data['createdAt'] ?? Timestamp.now();
+            final DateTime dateTime = ts.toDate();
+            final String day = DateFormat('EEEE').format(dateTime);
+            final String date = DateFormat('dd MMM yyyy').format(dateTime);
+            final String time = DateFormat('hh:mm a').format(dateTime);
+
+            // Extract detection info
+            String cancerType = "No Detection";
+            String confidenceStr = "-";
+            if (data['detectionResults'] != null &&
+                data['detectionResults']['detections'] != null &&
+                data['detectionResults']['detections'] is List) {
+              final detections = data['detectionResults']['detections'] as List;
+              if (detections.isNotEmpty) {
+                final det = detections[0];
+                final classId = det['class_id'];
+                final confidence = det['confidence'];
+                cancerType = classId == 0
+                    ? "Melanoma"
+                    : classId == 1
+                        ? "Vascular Lesion"
+                        : "Unknown";
+                confidenceStr = (confidence is double || confidence is int)
+                    ? "${(confidence * 100).toStringAsFixed(2)}%"
+                    : confidence.toString();
+              }
+            }
+
+            return Dismissible(
+              key: Key(doc.id),
+              direction: DismissDirection.endToStart,
+              background: Container(
+                alignment: Alignment.centerRight,
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                color: Colors.redAccent,
+                child: const Icon(Icons.delete, color: Colors.white, size: 32),
+              ),
+              confirmDismiss: (direction) async {
+                return await showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text("Delete Confirmation"),
+                    content: const Text(
+                        "Are you sure you want to delete this record?"),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(false),
+                        child: const Text("Cancel"),
                       ),
-                    ),
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(true),
+                        child: const Text("Delete",
+                            style: TextStyle(color: Colors.red)),
+                      ),
+                    ],
                   ),
                 );
               },
-            ),
+              onDismissed: (direction) {
+                _deleteDoc(context, doc.id);
+              },
+              child: Card(
+                color: const Color(
+                    0xFFF5FAFF), // Soft blue-tinted white, matches wallpaper
+                margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                elevation: 3,
+                shadowColor: const Color(0xFFB6D0E2)
+                    .withOpacity(0.3), // Soft blue shadow
+                child: ListTile(
+                  contentPadding:
+                      const EdgeInsets.symmetric(vertical: 12, horizontal: 18),
+                  title: Text(
+                    "$day, $date",
+                    style: const TextStyle(
+                      color: Color(0xFF223A5E),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  subtitle: Padding(
+                    padding: const EdgeInsets.only(top: 4.0),
+                    child: Text(
+                      time,
+                      style: const TextStyle(
+                        color: Color(0xFF4C6D83),
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                  trailing:
+                      const Icon(Icons.chevron_right, color: Color(0xFF223A5E)),
+                  onTap: () {
+                    showDialog(
+                      context: context,
+                      builder: (context) {
+                        return Dialog(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          backgroundColor: const Color(0xFFE3F0FF),
+                          child: Padding(
+                            padding: const EdgeInsets.all(20.0),
+                            child: SingleChildScrollView(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  if (data['image'] != null)
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: Image.memory(
+                                        base64Decode(
+                                          data['image'].contains(',')
+                                              ? data['image'].split(',').last
+                                              : data['image'],
+                                        ),
+                                        width: 180,
+                                        height: 180,
+                                        fit: BoxFit.cover,
+                                      ),
+                                    ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    "$day, $date",
+                                    style: const TextStyle(
+                                      color: Color(0xFF223A5E),
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                  Text(
+                                    time,
+                                    style: const TextStyle(
+                                      color: Color(0xFF4C6D83),
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  const Divider(height: 24),
+                                  Text(
+                                    "Cancer Type: $cancerType",
+                                    style: const TextStyle(
+                                      color: Color(0xFF223A5E),
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                  Text(
+                                    "Confidence: $confidenceStr",
+                                    style: const TextStyle(
+                                      color: Color(0xFF4C6D83),
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 18),
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceEvenly,
+                                    children: [
+                                      ElevatedButton.icon(
+                                        icon: const Icon(Icons.share,
+                                            color: Color(0xFF223A5E)),
+                                        label: const Text(
+                                          "Share",
+                                          style: TextStyle(
+                                            color: Color(0xFF223A5E),
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor:
+                                              const Color(0xFF8DC6A7),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                          ),
+                                        ),
+                                        onPressed: () async {
+                                          String shareText =
+                                              "Scan Result\nDate: $day, $date\nTime: $time\nCancer Type: $cancerType\nConfidence: $confidenceStr";
+                                          await Share.share(shareText);
+                                        },
+                                      ),
+                                      ElevatedButton.icon(
+                                        icon: const Icon(Icons.picture_as_pdf,
+                                            color: Color(0xFF223A5E)),
+                                        label: const Text(
+                                          "PDF",
+                                          style: TextStyle(
+                                            color: Color(0xFF223A5E),
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor:
+                                              const Color(0xFF8DC6A7),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                          ),
+                                        ),
+                                        onPressed: () async {
+                                          final pdf = pw.Document();
+                                          final imageBytes = data['image'] !=
+                                                  null
+                                              ? base64Decode(
+                                                  data['image'].contains(',')
+                                                      ? data['image']
+                                                          .split(',')
+                                                          .last
+                                                      : data['image'],
+                                                )
+                                              : null;
+                                          pdf.addPage(
+                                            pw.Page(
+                                              build: (pw.Context context) =>
+                                                  pw.Column(
+                                                crossAxisAlignment:
+                                                    pw.CrossAxisAlignment.start,
+                                                children: [
+                                                  pw.Text("Scan Result",
+                                                      style: pw.TextStyle(
+                                                          fontSize: 24,
+                                                          fontWeight: pw
+                                                              .FontWeight
+                                                              .bold)),
+                                                  pw.SizedBox(height: 12),
+                                                  if (imageBytes != null)
+                                                    pw.Center(
+                                                      child: pw.Image(
+                                                          pw.MemoryImage(
+                                                              imageBytes),
+                                                          width: 180,
+                                                          height: 180),
+                                                    ),
+                                                  pw.SizedBox(height: 12),
+                                                  pw.Text("Date: $day, $date"),
+                                                  pw.Text("Time: $time"),
+                                                  pw.Text(
+                                                      "Cancer Type: $cancerType"),
+                                                  pw.Text(
+                                                      "Confidence: $confidenceStr"),
+                                                ],
+                                              ),
+                                            ),
+                                          );
+                                          await Printing.layoutPdf(
+                                              onLayout: (format) => pdf.save());
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  ElevatedButton(
+                                    onPressed: () => Navigator.pop(context),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF8DC6A7),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      "Close",
+                                      style: TextStyle(
+                                        color: Color(0xFF223A5E),
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }

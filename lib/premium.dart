@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'home.dart';
 
 class PremiumScreen extends StatelessWidget {
   const PremiumScreen({super.key});
@@ -6,20 +7,25 @@ class PremiumScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF2F4858),
+      backgroundColor: const Color(0xFFE3F0FF), // baby blue
       appBar: AppBar(
-        backgroundColor: const Color(0xFF2F4858),
+        backgroundColor: const Color(0xFFE3F0FF),
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const Icon(Icons.home, color: Color(0xFF223A5E)), // Home icon
           onPressed: () {
-            Navigator.pop(context);
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (_) => const HomeScreen()),
+              (route) => false,
+            );
           },
         ),
         title: const Text(
           'Choose Your Plan',
-          style: TextStyle(color: Colors.white),
+          style: TextStyle(color: Color(0xFF223A5E)),
         ),
+        elevation: 0,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20.0),
@@ -30,14 +36,14 @@ class PremiumScreen extends StatelessWidget {
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
-                color: Colors.white,
+                color: Color(0xFF223A5E),
               ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 10),
             const Text(
               "Change the plan that works best for you. All plans include a 30 days trial.",
-              style: TextStyle(color: Colors.white),
+              style: TextStyle(color: Color(0xFF223A5E)),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 30),
@@ -49,8 +55,7 @@ class PremiumScreen extends StatelessWidget {
                 "Suggest nearest hospitals.",
               ],
               false,
-              isCurrentPlan:
-                  true, // Indicating this is the current plan selected
+              isCurrentPlan: true,
             ),
             const SizedBox(height: 20),
             _buildPlanCard(
@@ -85,17 +90,20 @@ class PremiumScreen extends StatelessWidget {
       String planName, String price, List<String> features, bool showLogo,
       {bool isPopular = false, bool isCurrentPlan = false}) {
     return Card(
-      color: isCurrentPlan ? Colors.grey : const Color(0xFF2F4858),
-      elevation: 8,
+      color: Colors.white,
+      elevation: isPopular ? 12 : 6,
+      shadowColor: isPopular ? const Color(0xFFF9B572) : Colors.black12,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 25),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          color: const Color(0xFF4C6D83),
+          borderRadius: BorderRadius.circular(16),
+          border: isPopular
+              ? Border.all(color: const Color(0xFFF9B572), width: 2)
+              : null,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -106,14 +114,17 @@ class PremiumScreen extends StatelessWidget {
                 children: [
                   Container(
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
-                      color: Colors.orange,
+                      color: const Color(0xFFF9B572),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Text(
                       "MOST POPULAR",
-                      style: TextStyle(color: Colors.white, fontSize: 10),
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold),
                     ),
                   ),
                 ],
@@ -124,15 +135,15 @@ class PremiumScreen extends StatelessWidget {
                 if (showLogo)
                   const Icon(
                     Icons.star,
-                    color: Colors.yellow,
+                    color: Color(0xFFF9B572),
                     size: 30,
                   ),
-                const SizedBox(width: 10),
+                if (showLogo) const SizedBox(width: 10),
                 Text(
                   planName,
                   style: const TextStyle(
                     fontSize: 22,
-                    color: Colors.white,
+                    color: Color(0xFF223A5E),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -143,7 +154,7 @@ class PremiumScreen extends StatelessWidget {
               price,
               style: const TextStyle(
                 fontSize: 16,
-                color: Colors.white,
+                color: Color(0xFF8DC6A7),
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -156,17 +167,21 @@ class PremiumScreen extends StatelessWidget {
                         child: Row(
                           children: [
                             const Icon(
-                              Icons.check,
-                              color: Colors.green,
-                              size: 16,
+                              Icons.check_circle,
+                              color: Color(0xFF8DC6A7),
+                              size: 18,
                             ),
                             const SizedBox(width: 10),
-                            Text(
-                              feature,
-                              style: const TextStyle(color: Colors.white),
-                              maxLines: 2, // Limit to 2 lines
-                              overflow:
-                                  TextOverflow.ellipsis, // Prevent overflow
+                            Expanded(
+                              child: Text(
+                                feature,
+                                style: const TextStyle(
+                                  color: Color(0xFF223A5E),
+                                  fontSize: 15,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                           ],
                         ),
@@ -182,18 +197,27 @@ class PremiumScreen extends StatelessWidget {
                         // Add navigation logic for upgrading
                       },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: isCurrentPlan ? Colors.grey : const Color.fromARGB(255, 216, 188, 132),
+                  backgroundColor: isCurrentPlan
+                      ? Colors.grey[300]
+                      : const Color(0xFF4C6D83),
+                  foregroundColor:
+                      isCurrentPlan ? Colors.black54 : Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
                   padding:
                       const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+                  elevation: isCurrentPlan ? 0 : 4,
                 ),
                 child: Text(
                   isCurrentPlan
                       ? "Current Plan"
                       : (showLogo ? "Upgrade to Premium" : "Select Plan"),
-                  style: const TextStyle(fontSize: 16, color: Colors.black),
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: isCurrentPlan ? Colors.black54 : Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),
