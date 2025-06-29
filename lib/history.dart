@@ -139,18 +139,24 @@ class _HistoryList extends StatelessWidget {
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
           return const Center(child: Text("No results saved yet."));
         }
+        if (snapshot.hasError) {
+          return Center(child: Text("Error: ${snapshot.error}"));
+        }
 
         final docs = snapshot.data!.docs.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
           if (data['createdAt'] == null) return false;
-          if (filter == 'all') return true;
-          if (filter == 'no_detection') {
-            final detections = data['detectionResults']?['detections'];
-            return detections == null ||
-                !(detections is List) ||
-                detections.isEmpty;
-          }
           final detections = data['detectionResults']?['detections'];
+          final isNoDetection = detections == null || !(detections is List) || detections.isEmpty;
+
+          if (filter == 'no_detection') {
+            return isNoDetection;
+          }
+          if (isNoDetection) {
+            // Only show in "No Detection" tab, not in "All" or others
+            return false;
+          }
+          if (filter == 'all') return true;
           if (detections is List && detections.isNotEmpty) {
             final classId = detections[0]['class_id'];
             if (filter == 'melanoma' && classId == 0) return true;
@@ -168,8 +174,15 @@ class _HistoryList extends StatelessWidget {
           itemBuilder: (context, index) {
             final doc = docs[index];
             final data = doc.data() as Map<String, dynamic>;
-            final Timestamp ts = data['createdAt'] ?? Timestamp.now();
-            final DateTime dateTime = ts.toDate();
+            final ts = data['createdAt'];
+DateTime dateTime;
+if (ts is Timestamp) {
+  dateTime = ts.toDate();
+} else if (ts is DateTime) {
+  dateTime = ts;
+} else {
+  dateTime = DateTime.now();
+}
             final String day = DateFormat('EEEE').format(dateTime);
             final String date = DateFormat('dd MMM yyyy').format(dateTime);
             final String time = DateFormat('hh:mm a').format(dateTime);
@@ -180,16 +193,19 @@ class _HistoryList extends StatelessWidget {
             final detections = data['detectionResults']?['detections'];
             if (detections is List && detections.isNotEmpty) {
               final det = detections[0];
-              final classId = det['class_id'];
-              final confidence = det['confidence'];
-              cancerType = classId == 0
-                  ? "Melanoma"
-                  : classId == 1
-                      ? "Vascular Lesion"
-                      : "Unknown";
-              confidenceStr = (confidence is double || confidence is int)
-                  ? "${(confidence * 100).toStringAsFixed(2)}%"
-                  : confidence.toString();
+final classId = det['class_id'] ?? -1;
+final rawConfidence = det['confidence'];
+final double confidence = (rawConfidence is int)
+    ? rawConfidence.toDouble()
+    : (rawConfidence is double ? rawConfidence : 0.0);
+
+cancerType = classId == 0
+    ? "Melanoma"
+    : classId == 1
+        ? "Vascular Lesion"
+        : "Unknown";
+confidenceStr = "${(confidence * 100).toStringAsFixed(2)}%";
+
             }
 
             return Dismissible(
@@ -272,18 +288,31 @@ class _HistoryList extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
                                   if (data['image'] != null)
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(12),
-                                      child: Image.memory(
-                                        base64Decode(
-                                          data['image'].contains(',')
-                                              ? data['image'].split(',').last
-                                              : data['image'],
-                                        ),
-                                        width: 180,
-                                        height: 180,
-                                        fit: BoxFit.cover,
-                                      ),
+                                    Builder(
+                                      builder: (context) {
+                                        try {
+                                          final imgStr = data['image'];
+                                          final bytes = base64Decode(
+                                            imgStr.contains(',')
+                                                ? imgStr.split(',').last
+                                                : imgStr,
+                                          );
+                                          return ClipRRect(
+                                            borderRadius: BorderRadius.circular(12),
+                                            child: Image.memory(
+                                              bytes,
+                                              width: 180,
+                                              height: 180,
+                                              fit: BoxFit.cover,
+                                            ),
+                                          );
+                                        } catch (e) {
+                                          return const Text(
+                                            "Image unavailable",
+                                            style: TextStyle(color: Colors.red),
+                                          );
+                                        }
+                                      },
                                     ),
                                   const SizedBox(height: 16),
                                   Text(

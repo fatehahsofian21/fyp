@@ -16,6 +16,20 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isPasswordVisible = false;
   bool _isLoading = false;
 
+  @override
+  void initState() {
+    super.initState();
+    // If already logged in, go to HomeScreen
+    if (FirebaseAuth.instance.currentUser != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+        );
+      });
+    }
+  }
+
   Future<void> _loginUser() async {
     setState(() {
       _isLoading = true;

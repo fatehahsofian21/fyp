@@ -338,7 +338,14 @@ class _HomeScreenState extends State<HomeScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         ElevatedButton.icon(
-                          onPressed: () => _pickImage(ImageSource.gallery),
+                          onPressed: () async {
+                            try {
+                              await _pickImage(ImageSource.gallery);
+                            } catch (e, stack) {
+                              print('Error: $e');
+                              print(stack);
+                            }
+                          },
                           icon: const Icon(Icons.upload, color: iconColor),
                           label: const Text(
                             "Upload image",

@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart'; // ✅ Import Geolocator
 import 'login.dart'; // Import your login screen
 import 'home.dart'; // Import HomeScreen instead of HistoryScreen
 import 'history.dart'; // Import HistoryScreen
+import 'splash.dart'; // Add this import
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized(); // Ensures Flutter is ready
@@ -60,26 +61,18 @@ class MyApp extends StatelessWidget {
       home: StreamBuilder<User?>(
         stream: FirebaseAuth.instance.authStateChanges(),
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.active) {
-            if (snapshot.hasData) {
-              // If user is logged in, navigate to home screen or other main screen
-              return const HomeScreen(); // Home screen is now the first screen
-            } else {
-              // If user is not logged in, show login screen
-              return const LoginScreen();
-            }
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const SplashScreen();
           }
-
-          // Show loading indicator while checking login state
-          return const Center(child: CircularProgressIndicator());
+          if (snapshot.hasData) {
+            return const HomeScreen();
+          }
+          return const SplashScreen();
         },
       ),
-      // Define the routes, including passing data dynamically
       routes: {
-        '/history': (context) => HistoryScreen(
-              detectionResults: ModalRoute.of(context)!.settings.arguments
-                  as Map<String, double>,
-            ), // Navigate to HistoryScreen with detectionResults
+        '/login': (context) => const LoginScreen(),
+        '/history': (context) => const HistoryScreen(),
       },
     );
   }

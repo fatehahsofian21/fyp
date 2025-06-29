@@ -34,9 +34,15 @@ class ResultScreen extends StatelessWidget {
             .add({
           'userId': user.uid,
           'scanId': scanId,
-          'detectionResults': results,
-          'image': results['image'],
+          'image': results['image'], // base64 image string
+          'detectionResults': {
+            // If no detections, save an empty list
+            'detections': results['detections'] ?? [],
+          },
           'createdAt': FieldValue.serverTimestamp(),
+          // Optionally, add a marker for no detection
+          'noDetection': (results['detections'] == null ||
+              (results['detections'] as List).isEmpty),
         });
       }
     } catch (e) {
@@ -478,7 +484,7 @@ class ResultScreen extends StatelessWidget {
                       onPressed: () {
                         _saveToFirebase({
                           'image': base64Image,
-                          'detections': detectionResults,
+                          'detections': detectionResults, // [] if no detection
                         });
                         Navigator.pushAndRemoveUntil(
                           context,
