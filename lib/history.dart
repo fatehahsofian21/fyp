@@ -12,6 +12,8 @@ class HistoryScreen extends StatelessWidget {
   final Map<String, dynamic> detectionResults;
 
   Future<void> _resetAll(BuildContext context) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -33,8 +35,11 @@ class HistoryScreen extends StatelessWidget {
     );
     if (confirm == true) {
       final batch = FirebaseFirestore.instance.batch();
-      final snapshot =
-          await FirebaseFirestore.instance.collection('scan_results').get();
+      final snapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('scan_results')
+          .get();
       for (var doc in snapshot.docs) {
         batch.delete(doc.reference);
       }
@@ -134,15 +139,20 @@ class _HistoryList extends StatelessWidget {
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
           return const Center(child: Text("No results saved yet."));
         }
+
         final docs = snapshot.data!.docs.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
+          if (data['createdAt'] == null) return false;
           if (filter == 'all') return true;
-          if (data['detectionResults'] != null &&
-              data['detectionResults']['detections'] != null &&
-              data['detectionResults']['detections'] is List &&
-              (data['detectionResults']['detections'] as List).isNotEmpty) {
-            final det = data['detectionResults']['detections'][0];
-            final classId = det['class_id'];
+          if (filter == 'no_detection') {
+            final detections = data['detectionResults']?['detections'];
+            return detections == null ||
+                !(detections is List) ||
+                detections.isEmpty;
+          }
+          final detections = data['detectionResults']?['detections'];
+          if (detections is List && detections.isNotEmpty) {
+            final classId = detections[0]['class_id'];
             if (filter == 'melanoma' && classId == 0) return true;
             if (filter == 'vascular' && classId == 1) return true;
           }
@@ -167,23 +177,19 @@ class _HistoryList extends StatelessWidget {
             // Extract detection info
             String cancerType = "No Detection";
             String confidenceStr = "-";
-            if (data['detectionResults'] != null &&
-                data['detectionResults']['detections'] != null &&
-                data['detectionResults']['detections'] is List) {
-              final detections = data['detectionResults']['detections'] as List;
-              if (detections.isNotEmpty) {
-                final det = detections[0];
-                final classId = det['class_id'];
-                final confidence = det['confidence'];
-                cancerType = classId == 0
-                    ? "Melanoma"
-                    : classId == 1
-                        ? "Vascular Lesion"
-                        : "Unknown";
-                confidenceStr = (confidence is double || confidence is int)
-                    ? "${(confidence * 100).toStringAsFixed(2)}%"
-                    : confidence.toString();
-              }
+            final detections = data['detectionResults']?['detections'];
+            if (detections is List && detections.isNotEmpty) {
+              final det = detections[0];
+              final classId = det['class_id'];
+              final confidence = det['confidence'];
+              cancerType = classId == 0
+                  ? "Melanoma"
+                  : classId == 1
+                      ? "Vascular Lesion"
+                      : "Unknown";
+              confidenceStr = (confidence is double || confidence is int)
+                  ? "${(confidence * 100).toStringAsFixed(2)}%"
+                  : confidence.toString();
             }
 
             return Dismissible(
@@ -220,15 +226,12 @@ class _HistoryList extends StatelessWidget {
                 _deleteDoc(context, doc.id);
               },
               child: Card(
-                color: const Color(
-                    0xFFF5FAFF), // Soft blue-tinted white, matches wallpaper
+                color: const Color(0xFFF5FAFF),
                 margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
                 elevation: 3,
-                shadowColor: const Color(0xFFB6D0E2)
-                    .withOpacity(0.3), // Soft blue shadow
                 child: ListTile(
                   contentPadding:
                       const EdgeInsets.symmetric(vertical: 12, horizontal: 18),
@@ -315,104 +318,6 @@ class _HistoryList extends StatelessWidget {
                                     ),
                                   ),
                                   const SizedBox(height: 18),
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceEvenly,
-                                    children: [
-                                      ElevatedButton.icon(
-                                        icon: const Icon(Icons.share,
-                                            color: Color(0xFF223A5E)),
-                                        label: const Text(
-                                          "Share",
-                                          style: TextStyle(
-                                            color: Color(0xFF223A5E),
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor:
-                                              const Color(0xFF8DC6A7),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(12),
-                                          ),
-                                        ),
-                                        onPressed: () async {
-                                          String shareText =
-                                              "Scan Result\nDate: $day, $date\nTime: $time\nCancer Type: $cancerType\nConfidence: $confidenceStr";
-                                          await Share.share(shareText);
-                                        },
-                                      ),
-                                      ElevatedButton.icon(
-                                        icon: const Icon(Icons.picture_as_pdf,
-                                            color: Color(0xFF223A5E)),
-                                        label: const Text(
-                                          "PDF",
-                                          style: TextStyle(
-                                            color: Color(0xFF223A5E),
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor:
-                                              const Color(0xFF8DC6A7),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(12),
-                                          ),
-                                        ),
-                                        onPressed: () async {
-                                          final pdf = pw.Document();
-                                          final imageBytes = data['image'] !=
-                                                  null
-                                              ? base64Decode(
-                                                  data['image'].contains(',')
-                                                      ? data['image']
-                                                          .split(',')
-                                                          .last
-                                                      : data['image'],
-                                                )
-                                              : null;
-                                          pdf.addPage(
-                                            pw.Page(
-                                              build: (pw.Context context) =>
-                                                  pw.Column(
-                                                crossAxisAlignment:
-                                                    pw.CrossAxisAlignment.start,
-                                                children: [
-                                                  pw.Text("Scan Result",
-                                                      style: pw.TextStyle(
-                                                          fontSize: 24,
-                                                          fontWeight: pw
-                                                              .FontWeight
-                                                              .bold)),
-                                                  pw.SizedBox(height: 12),
-                                                  if (imageBytes != null)
-                                                    pw.Center(
-                                                      child: pw.Image(
-                                                          pw.MemoryImage(
-                                                              imageBytes),
-                                                          width: 180,
-                                                          height: 180),
-                                                    ),
-                                                  pw.SizedBox(height: 12),
-                                                  pw.Text("Date: $day, $date"),
-                                                  pw.Text("Time: $time"),
-                                                  pw.Text(
-                                                      "Cancer Type: $cancerType"),
-                                                  pw.Text(
-                                                      "Confidence: $confidenceStr"),
-                                                ],
-                                              ),
-                                            ),
-                                          );
-                                          await Printing.layoutPdf(
-                                              onLayout: (format) => pdf.save());
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 12),
                                   ElevatedButton(
                                     onPressed: () => Navigator.pop(context),
                                     style: ElevatedButton.styleFrom(
