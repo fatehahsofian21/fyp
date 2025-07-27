@@ -6,6 +6,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:pdf/pdf.dart';
 
 class HistoryScreen extends StatelessWidget {
   const HistoryScreen({super.key, this.detectionResults = const {}});
@@ -53,7 +54,7 @@ class HistoryScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 4,
+      length: 3,
       child: Scaffold(
         appBar: AppBar(
           title: const Text("Scan History"),
@@ -80,7 +81,6 @@ class HistoryScreen extends StatelessWidget {
                   Tab(text: "All"),
                   Tab(text: "Melanoma"),
                   Tab(text: "Vascular"),
-                  Tab(text: "No Detection"),
                 ],
               ),
             ),
@@ -92,7 +92,6 @@ class HistoryScreen extends StatelessWidget {
             _HistoryList(filter: 'all'),
             _HistoryList(filter: 'melanoma'),
             _HistoryList(filter: 'vascular'),
-            _HistoryList(filter: 'no_detection'),
           ],
         ),
       ),
@@ -117,6 +116,76 @@ class _HistoryList extends StatelessWidget {
         const SnackBar(content: Text("Deleted successfully.")),
       );
     }
+  }
+
+  Future<void> _saveAsPdf(
+      BuildContext context,
+      Map<String, dynamic> data,
+      String cancerType,
+      String confidenceStr,
+      String day,
+      String date,
+      String time) async {
+    final pdf = pw.Document();
+    pdf.addPage(
+      pw.Page(
+        build: (pw.Context context) => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Center(
+              child: pw.Text('Skin Cancer Scan Report',
+                  style: pw.TextStyle(
+                      fontSize: 26, fontWeight: pw.FontWeight.bold)),
+            ),
+            pw.Divider(),
+            pw.SizedBox(height: 10),
+            pw.Text('Date: $day, $date', style: pw.TextStyle(fontSize: 14)),
+            pw.Text('Time: $time', style: pw.TextStyle(fontSize: 14)),
+            pw.SizedBox(height: 10),
+            pw.Text('Cancer Type: $cancerType',
+                style:
+                    pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+            pw.Text('Confidence: $confidenceStr',
+                style: pw.TextStyle(fontSize: 16)),
+            pw.SizedBox(height: 16),
+            if (data['image'] != null)
+              pw.Center(
+                child: pw.Image(
+                  pw.MemoryImage(
+                    base64Decode(
+                      data['image'].contains(',')
+                          ? data['image'].split(',').last
+                          : data['image'],
+                    ),
+                  ),
+                  width: 180,
+                  height: 180,
+                ),
+              ),
+            pw.SizedBox(height: 16),
+            pw.Text('Thank you for using our app!',
+                style: pw.TextStyle(fontSize: 12, color: PdfColors.grey)),
+          ],
+        ),
+      ),
+    );
+    await Printing.layoutPdf(onLayout: (format) async => pdf.save());
+  }
+
+  Future<void> _shareResult(
+      BuildContext context,
+      Map<String, dynamic> data,
+      String cancerType,
+      String confidenceStr,
+      String day,
+      String date,
+      String time) async {
+    String text = 'Scan Result\n'
+        'Date: $day, $date\n'
+        'Time: $time\n'
+        'Cancer Type: $cancerType\n'
+        'Confidence: $confidenceStr\n';
+    await Share.share(text);
   }
 
   @override
@@ -147,15 +216,9 @@ class _HistoryList extends StatelessWidget {
           final data = doc.data() as Map<String, dynamic>;
           if (data['createdAt'] == null) return false;
           final detections = data['detectionResults']?['detections'];
-          final isNoDetection = detections == null || !(detections is List) || detections.isEmpty;
+          final isNoDetection =
+              detections == null || !(detections is List) || detections.isEmpty;
 
-          if (filter == 'no_detection') {
-            return isNoDetection;
-          }
-          if (isNoDetection) {
-            // Only show in "No Detection" tab, not in "All" or others
-            return false;
-          }
           if (filter == 'all') return true;
           if (detections is List && detections.isNotEmpty) {
             final classId = detections[0]['class_id'];
@@ -175,14 +238,14 @@ class _HistoryList extends StatelessWidget {
             final doc = docs[index];
             final data = doc.data() as Map<String, dynamic>;
             final ts = data['createdAt'];
-DateTime dateTime;
-if (ts is Timestamp) {
-  dateTime = ts.toDate();
-} else if (ts is DateTime) {
-  dateTime = ts;
-} else {
-  dateTime = DateTime.now();
-}
+            DateTime dateTime;
+            if (ts is Timestamp) {
+              dateTime = ts.toDate();
+            } else if (ts is DateTime) {
+              dateTime = ts;
+            } else {
+              dateTime = DateTime.now();
+            }
             final String day = DateFormat('EEEE').format(dateTime);
             final String date = DateFormat('dd MMM yyyy').format(dateTime);
             final String time = DateFormat('hh:mm a').format(dateTime);
@@ -193,19 +256,18 @@ if (ts is Timestamp) {
             final detections = data['detectionResults']?['detections'];
             if (detections is List && detections.isNotEmpty) {
               final det = detections[0];
-final classId = det['class_id'] ?? -1;
-final rawConfidence = det['confidence'];
-final double confidence = (rawConfidence is int)
-    ? rawConfidence.toDouble()
-    : (rawConfidence is double ? rawConfidence : 0.0);
+              final classId = det['class_id'] ?? -1;
+              final rawConfidence = det['confidence'];
+              final double confidence = (rawConfidence is int)
+                  ? rawConfidence.toDouble()
+                  : (rawConfidence is double ? rawConfidence : 0.0);
 
-cancerType = classId == 0
-    ? "Melanoma"
-    : classId == 1
-        ? "Vascular Lesion"
-        : "Unknown";
-confidenceStr = "${(confidence * 100).toStringAsFixed(2)}%";
-
+              cancerType = classId == 0
+                  ? "Melanoma"
+                  : classId == 1
+                      ? "Vascular Lesion"
+                      : "Unknown";
+              confidenceStr = "${(confidence * 100).toStringAsFixed(2)}%";
             }
 
             return Dismissible(
@@ -243,29 +305,29 @@ confidenceStr = "${(confidence * 100).toStringAsFixed(2)}%";
               },
               child: Card(
                 color: const Color(0xFFF5FAFF),
-                margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                elevation: 3,
+                elevation: 2,
                 child: ListTile(
                   contentPadding:
-                      const EdgeInsets.symmetric(vertical: 12, horizontal: 18),
+                      const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
                   title: Text(
                     "$day, $date",
                     style: const TextStyle(
                       color: Color(0xFF223A5E),
                       fontWeight: FontWeight.bold,
-                      fontSize: 16,
+                      fontSize: 14,
                     ),
                   ),
                   subtitle: Padding(
-                    padding: const EdgeInsets.only(top: 4.0),
+                    padding: const EdgeInsets.only(top: 2.0),
                     child: Text(
                       time,
                       style: const TextStyle(
                         color: Color(0xFF4C6D83),
-                        fontSize: 14,
+                        fontSize: 12,
                       ),
                     ),
                   ),
@@ -277,11 +339,11 @@ confidenceStr = "${(confidence * 100).toStringAsFixed(2)}%";
                       builder: (context) {
                         return Dialog(
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
+                            borderRadius: BorderRadius.circular(16),
                           ),
                           backgroundColor: const Color(0xFFE3F0FF),
                           child: Padding(
-                            padding: const EdgeInsets.all(20.0),
+                            padding: const EdgeInsets.all(12.0),
                             child: SingleChildScrollView(
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
@@ -298,11 +360,12 @@ confidenceStr = "${(confidence * 100).toStringAsFixed(2)}%";
                                                 : imgStr,
                                           );
                                           return ClipRRect(
-                                            borderRadius: BorderRadius.circular(12),
+                                            borderRadius:
+                                                BorderRadius.circular(8),
                                             child: Image.memory(
                                               bytes,
-                                              width: 180,
-                                              height: 180,
+                                              width: 120,
+                                              height: 120,
                                               fit: BoxFit.cover,
                                             ),
                                           );
@@ -314,45 +377,106 @@ confidenceStr = "${(confidence * 100).toStringAsFixed(2)}%";
                                         }
                                       },
                                     ),
-                                  const SizedBox(height: 16),
+                                  const SizedBox(height: 10),
                                   Text(
                                     "$day, $date",
                                     style: const TextStyle(
                                       color: Color(0xFF223A5E),
                                       fontWeight: FontWeight.bold,
-                                      fontSize: 16,
+                                      fontSize: 14,
                                     ),
                                   ),
                                   Text(
                                     time,
                                     style: const TextStyle(
                                       color: Color(0xFF4C6D83),
-                                      fontSize: 14,
+                                      fontSize: 12,
                                     ),
                                   ),
-                                  const Divider(height: 24),
+                                  const Divider(height: 16),
                                   Text(
                                     "Cancer Type: $cancerType",
                                     style: const TextStyle(
                                       color: Color(0xFF223A5E),
                                       fontWeight: FontWeight.bold,
-                                      fontSize: 15,
+                                      fontSize: 13,
                                     ),
                                   ),
                                   Text(
                                     "Confidence: $confidenceStr",
                                     style: const TextStyle(
                                       color: Color(0xFF4C6D83),
-                                      fontSize: 14,
+                                      fontSize: 12,
                                     ),
                                   ),
-                                  const SizedBox(height: 18),
+                                  const SizedBox(height: 10),
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceEvenly,
+                                    children: [
+                                      ElevatedButton.icon(
+                                        onPressed: () => _saveAsPdf(
+                                            context,
+                                            data,
+                                            cancerType,
+                                            confidenceStr,
+                                            day,
+                                            date,
+                                            time),
+                                        icon: const Icon(Icons.picture_as_pdf,
+                                            color: Color(0xFF223A5E)),
+                                        label: const Text(
+                                          "Save as PDF",
+                                          style: TextStyle(
+                                              color: Color(0xFF223A5E),
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12),
+                                        ),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor:
+                                              const Color(0xFF8DC6A7),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                          ),
+                                        ),
+                                      ),
+                                      ElevatedButton.icon(
+                                        onPressed: () => _shareResult(
+                                            context,
+                                            data,
+                                            cancerType,
+                                            confidenceStr,
+                                            day,
+                                            date,
+                                            time),
+                                        icon: const Icon(Icons.share,
+                                            color: Color(0xFF223A5E)),
+                                        label: const Text(
+                                          "Share",
+                                          style: TextStyle(
+                                              color: Color(0xFF223A5E),
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12),
+                                        ),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor:
+                                              const Color(0xFF8DC6A7),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
                                   ElevatedButton(
                                     onPressed: () => Navigator.pop(context),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: const Color(0xFF8DC6A7),
                                       shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
+                                        borderRadius: BorderRadius.circular(8),
                                       ),
                                     ),
                                     child: const Text(
@@ -360,6 +484,7 @@ confidenceStr = "${(confidence * 100).toStringAsFixed(2)}%";
                                       style: TextStyle(
                                         color: Color(0xFF223A5E),
                                         fontWeight: FontWeight.bold,
+                                        fontSize: 12,
                                       ),
                                     ),
                                   ),

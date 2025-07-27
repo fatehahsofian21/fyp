@@ -5,8 +5,10 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
 import 'dart:math' as math;
-import 'home.dart';
+import 'home.dart' as home; // <--- Use prefix to avoid ambiguous import
 import 'hospitals.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'dart:typed_data';
 
 class ResultScreen extends StatelessWidget {
   final String base64Image;
@@ -27,6 +29,8 @@ class ResultScreen extends StatelessWidget {
       User? user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         String scanId = DateTime.now().millisecondsSinceEpoch.toString();
+
+        // Save directly to Firestore (no Firebase Storage)
         await FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
@@ -34,15 +38,11 @@ class ResultScreen extends StatelessWidget {
             .add({
           'userId': user.uid,
           'scanId': scanId,
-          'image': results['image'], // base64 image string
+          'image': results['image'], // base64 string
           'detectionResults': {
-            // If no detections, save an empty list
-            'detections': results['detections'] ?? [],
+            'detections': results['detections'],
           },
           'createdAt': FieldValue.serverTimestamp(),
-          // Optionally, add a marker for no detection
-          'noDetection': (results['detections'] == null ||
-              (results['detections'] as List).isEmpty),
         });
       }
     } catch (e) {
@@ -262,7 +262,8 @@ class ResultScreen extends StatelessWidget {
                     onPressed: () {
                       Navigator.pushAndRemoveUntil(
                         context,
-                        MaterialPageRoute(builder: (_) => const HomeScreen()),
+                        MaterialPageRoute(
+                            builder: (_) => const home.HomeScreen()),
                         (_) => false,
                       );
                     },
@@ -481,14 +482,16 @@ class ResultScreen extends StatelessWidget {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: () {
-                        _saveToFirebase({
+                      onPressed: () async {
+                        await _saveToFirebase({
                           'image': base64Image,
-                          'detections': detectionResults, // [] if no detection
+                          'detections':
+                              detectionResults, // will be [] if no detection
                         });
                         Navigator.pushAndRemoveUntil(
                           context,
-                          MaterialPageRoute(builder: (_) => const HomeScreen()),
+                          MaterialPageRoute(
+                              builder: (_) => const home.HomeScreen()),
                           (_) => false,
                         );
                       },

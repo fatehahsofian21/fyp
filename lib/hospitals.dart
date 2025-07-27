@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'premium.dart'; // Import premium.dart to navigate
+import 'premium.dart'; // Navigate to premium screen
 
 class HospitalsScreen extends StatelessWidget {
   final List<Map<String, dynamic>> nearestHospitals;
@@ -9,9 +9,9 @@ class HospitalsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFE3F0FF), // baby blue
+      backgroundColor: const Color(0xFFE3F0FF),
       appBar: AppBar(
-        backgroundColor: const Color(0xFFE3F0FF), // baby blue
+        backgroundColor: const Color(0xFFE3F0FF),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black87),
           onPressed: () {
@@ -19,47 +19,59 @@ class HospitalsScreen extends StatelessWidget {
           },
         ),
         centerTitle: true,
-        title: const Text("",
-            style: TextStyle(color: Colors.black87)), // Empty title
+        title: const Text("", style: TextStyle(color: Colors.black87)),
         elevation: 0,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            const Text(
-              "Nearest Medical Center to You",
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF223A5E), // dark blue for contrast
+        child: nearestHospitals.isEmpty
+            ? const Center(
+                child: Text(
+                  "No hospitals found nearby.",
+                  style: TextStyle(fontSize: 16, color: Color(0xFF223A5E)),
+                ),
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const Text(
+                    "Nearest Medical Center to You",
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF223A5E),
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 20),
+                  if (nearestHospitals.isNotEmpty)
+                    _buildHospitalCard(context, nearestHospitals[0],
+                        isTop: true),
+                  const SizedBox(height: 16),
+                  if (nearestHospitals.length > 1)
+                    _buildHospitalCard(context, nearestHospitals[1]),
+                  const SizedBox(height: 12),
+                  if (nearestHospitals.length > 2)
+                    _buildHospitalCard(context, nearestHospitals[2]),
+                ],
               ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 20),
-            if (nearestHospitals.isNotEmpty)
-              _buildHospitalCard(context, nearestHospitals[0], isTop: true),
-            const SizedBox(height: 16),
-            if (nearestHospitals.length > 1)
-              _buildHospitalCard(context, nearestHospitals[1]),
-            const SizedBox(height: 12),
-            if (nearestHospitals.length > 2)
-              _buildHospitalCard(context, nearestHospitals[2]),
-          ],
-        ),
       ),
     );
   }
 
   Widget _buildHospitalCard(BuildContext context, Map<String, dynamic> hospital,
       {bool isTop = false}) {
+    String name = hospital['name'] ?? 'Unknown Hospital';
+    String distance = (hospital['distance'] is double)
+        ? "${hospital['distance'].toStringAsFixed(2)} km"
+        : "0.00 km";
+
     return InkWell(
       onTap: () {
         _showHospitalDetails(context, hospital);
       },
       child: Card(
-        color: Colors.white, // Use white for the card for contrast
+        color: Colors.white,
         elevation: 6,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
@@ -72,19 +84,19 @@ class HospitalsScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Text(
-                      hospital['name'] ?? '',
+                      name,
                       style: const TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF223A5E), // dark blue
+                        color: Color(0xFF223A5E),
                       ),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      "${hospital['distance']?.toStringAsFixed(2)} km",
+                      distance,
                       style: const TextStyle(
-                          fontSize: 16, color: Color(0xFF8DC6A7)), // soft green
+                          fontSize: 16, color: Color(0xFF8DC6A7)),
                     ),
                   ],
                 )
@@ -93,7 +105,7 @@ class HospitalsScreen extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        hospital['name'] ?? '',
+                        name,
                         style: const TextStyle(
                             fontSize: 16, color: Color(0xFF223A5E)),
                         overflow: TextOverflow.ellipsis,
@@ -101,9 +113,9 @@ class HospitalsScreen extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      "${hospital['distance']?.toStringAsFixed(2)} km",
+                      distance,
                       style: const TextStyle(
-                          fontSize: 16, color: Color(0xFF8DC6A7)), // soft green
+                          fontSize: 16, color: Color(0xFF8DC6A7)),
                     ),
                   ],
                 ),
@@ -114,6 +126,12 @@ class HospitalsScreen extends StatelessWidget {
 
   void _showHospitalDetails(
       BuildContext context, Map<String, dynamic> hospital) {
+    String name = hospital['name'] ?? 'Hospital Details';
+    String distance = (hospital['distance'] is double)
+        ? "${hospital['distance'].toStringAsFixed(2)} km"
+        : "0.00 km";
+    String phone = hospital['phone'] ?? 'Phone number not available.';
+
     showDialog(
       context: context,
       builder: (context) {
@@ -121,12 +139,12 @@ class HospitalsScreen extends StatelessWidget {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
-          backgroundColor: const Color(0xFFE3F0FF), // baby blue like wallpaper
+          backgroundColor: const Color(0xFFE3F0FF),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                hospital['name'] ?? 'Hospital Details',
+                name,
                 style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
@@ -136,7 +154,7 @@ class HospitalsScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               Text(
-                "Distance: ${hospital['distance']?.toStringAsFixed(2)} km",
+                "Distance: $distance",
                 style: const TextStyle(
                   color: Color(0xFF223A5E),
                   fontSize: 16,
@@ -144,7 +162,7 @@ class HospitalsScreen extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               Text(
-                "Phone: ${hospital['phone'] ?? 'Phone not available'}",
+                "Phone: $phone",
                 style: const TextStyle(
                   color: Color(0xFF223A5E),
                   fontSize: 16,
@@ -188,5 +206,29 @@ class HospitalsScreen extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+Future<String> _fetchPhoneNumber(String placeId) async {
+  try {
+    await Future.delayed(const Duration(seconds: 1));
+    return "+1 234 567 8900";
+  } catch (_) {
+    return "Phone number not available.";
+  }
+}
+
+Future<void> fetchAndSetHospitalsPhoneNumbers(
+    List<Map<String, dynamic>> hospitals) async {
+  // Filter out hospitals with null or non-string place_id
+  hospitals.removeWhere((h) =>
+      h['place_id'] == null ||
+      h['place_id'] is! String ||
+      (h['place_id'] as String).isEmpty);
+
+  for (var hospital in hospitals) {
+    final placeId = hospital['place_id'];
+    final phoneNumber = await _fetchPhoneNumber(placeId);
+    hospital['phone'] = phoneNumber;
   }
 }
